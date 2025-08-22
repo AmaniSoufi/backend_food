@@ -139,7 +139,7 @@ authRouter.post('/api/signup', async (req, res) => {
   }
 });
 
-authRouter.post("/tokenIsValid" , async (res , req) => {
+authRouter.post("/tokenIsValid" , async (req , res) => {
   try {
     const token = req.header('x-auth-token');
 
