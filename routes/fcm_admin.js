@@ -203,6 +203,7 @@ async function sendNewOrderNotification(orderId, restaurantId) {
     console.log('🔔 FCM Token exists:', restaurant?.fcmToken ? 'YES' : 'NO');
 
     if (restaurant && restaurant.fcmToken) {
+      // Send to specific user token
       const message = {
         token: restaurant.fcmToken,
         notification: {
@@ -242,7 +243,47 @@ async function sendNewOrderNotification(orderId, restaurantId) {
       console.log(`✅ New order notification sent to restaurant: ${restaurant.email}`);
       console.log(`✅ FCM Response: ${response}`);
     } else {
-      console.log('❌ Restaurant admin not found or no FCM token');
+      // Fallback: Send to admin topic
+      console.log('🔄 No FCM token found, sending to admin topic...');
+      
+      const message = {
+        topic: 'admin',
+        notification: {
+          title: 'طلب جديد! 🍕',
+          body: 'لديك طلب جديد ينتظر التأكيد',
+        },
+        data: {
+          type: 'new_order',
+          orderId: orderId,
+          restaurantId: restaurantId,
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'food_delivery_channel',
+            priority: 'high',
+            defaultSound: true,
+            defaultVibrateTimings: true,
+            icon: '@mipmap/ic_launcher',
+          },
+        },
+        apns: {
+          payload: {
+            aps: {
+              sound: 'default',
+              badge: 1,
+              alert: {
+                title: 'طلب جديد! 🍕',
+                body: 'لديك طلب جديد ينتظر التأكيد',
+              },
+            },
+          },
+        },
+      };
+
+      const response = await admin.messaging().send(message);
+      console.log(`✅ New order notification sent to admin topic`);
+      console.log(`✅ FCM Response: ${response}`);
     }
   } catch (error) {
     console.error('❌ Error sending new order notification:', error);
