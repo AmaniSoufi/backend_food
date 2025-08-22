@@ -273,8 +273,16 @@ userRouter.post('/api/order', auth, async (req, res) => {
         console.log('🚚 Customer Location:', `${latitude}, ${longitude}`);
         console.log('🚚 Admin Users to notify:', adminUsers.length);
         
-        // Here you can add push notifications, email, or SMS notifications
-        // For now, we'll just log the notification
+        // Send FCM notifications to admin users
+        const { sendNewOrderNotification } = require('./fcm_admin');
+        
+        try {
+          await sendNewOrderNotification(order._id.toString(), restaurant._id.toString());
+          console.log('✅ FCM notification sent successfully');
+        } catch (fcmError) {
+          console.error('❌ Error sending FCM notification:', fcmError);
+        }
+        
         adminUsers.forEach(admin => {
           console.log(`🚚 Notifying admin: ${admin.name} (${admin.email})`);
         });

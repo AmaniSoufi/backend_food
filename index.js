@@ -6,6 +6,8 @@ const adminRouter = require('./routes/admin.js');
 const ProductRouter = require('./routes/product.js');
 const userRouter = require('./routes/user.js');
 const { notificationRouter } = require('./routes/notification.js');
+const { fcmRouter } = require('./routes/fcm.js');
+const { fcmAdminRouter } = require('./routes/fcm_admin.js');
 const deliveryRouter = require('./routes/delivery.js');
 const app = express();
 const port = 3000;
@@ -23,7 +25,8 @@ app.get('/', (req, res) => {
       delivery: '/delivery',
       user: '/user',
       product: '/product',
-      notification: '/notification'
+      notification: '/notification',
+      fcm: '/fcm'
     }
   });
 });
@@ -33,6 +36,8 @@ app.use(adminRouter);
 app.use(ProductRouter);
 app.use(userRouter);
 app.use(notificationRouter);
+app.use(fcmRouter);
+app.use(fcmAdminRouter);
 app.use(deliveryRouter);
 
 // Add restaurant router

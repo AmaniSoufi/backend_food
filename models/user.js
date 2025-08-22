@@ -59,6 +59,11 @@ const userSchema = mongoose.Schema({
         enum: ['pending', 'accepted', 'rejected'],
         default: 'pending', // Only used for delivery
     },
+    // FCM Token for push notifications
+    fcmToken: {
+        type: String,
+        default: null,
+    },
     // Delivery person specific fields
     currentLocation: {
         latitude: Number,
