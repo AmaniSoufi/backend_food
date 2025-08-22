@@ -5,14 +5,22 @@ const admin = require('firebase-admin');
 const fcmAdminRouter = express.Router();
 
 // Initialize Firebase Admin SDK
-// You need to download serviceAccountKey.json from Firebase Console
-// Go to Project Settings > Service accounts > Generate new private key
+// Try to load from environment variables first, then from file
 let serviceAccount;
 try {
-  serviceAccount = require('../serviceAccountKey.json');
+  // Try to load from environment variables (for production)
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log('✅ Firebase Admin SDK initialized from environment variables');
+  } else {
+    // Try to load from file (for development)
+    serviceAccount = require('../serviceAccountKey.json');
+    console.log('✅ Firebase Admin SDK initialized from serviceAccountKey.json');
+  }
 } catch (error) {
-  console.log('❌ serviceAccountKey.json not found. Please download it from Firebase Console');
-  console.log('📁 Place it in: server/serviceAccountKey.json');
+  console.log('❌ Firebase Admin SDK initialization failed');
+  console.log('📝 Please set FIREBASE_SERVICE_ACCOUNT environment variable in Render');
+  console.log('📝 Or place serviceAccountKey.json in: server/serviceAccountKey.json');
 }
 
 if (serviceAccount) {
