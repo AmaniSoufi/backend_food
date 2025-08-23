@@ -420,6 +420,16 @@ adminRouter.post("/admin/change-order-status", admin, async (req, res) => {
             newStatus: status
         });
         
+        // إرسال إشعار FCM للمشتري عند تحديث حالة الطلب
+        try {
+            const { sendOrderStatusNotification } = require('./fcm_admin');
+            await sendOrderStatusNotification(order._id.toString(), order.userId.toString(), status);
+            console.log('✅ FCM status update notification sent to customer');
+        } catch (fcmError) {
+            console.error('❌ Error sending FCM status update notification:', fcmError);
+            // لا نريد أن نفشل العملية إذا فشل FCM
+        }
+        
         res.json(orderObj);
     } catch (e) {
         console.error('Error changing order status:', e);
@@ -569,6 +579,16 @@ adminRouter.post('/admin/auto-assign-delivery/:orderId', admin, async (req, res)
         await nearestDelivery.save();
 
         console.log(`✅ تم تعيين السائق ${nearestDelivery.name} للطلب ${order._id}`);
+
+        // إرسال إشعار FCM للمندوب عند تعيينه للطلب
+        try {
+            const { sendDeliveryAssignmentNotification } = require('./fcm_admin');
+            await sendDeliveryAssignmentNotification(order._id.toString(), nearestDelivery._id.toString());
+            console.log('✅ FCM delivery assignment notification sent to delivery person');
+        } catch (fcmError) {
+            console.error('❌ Error sending FCM delivery assignment notification:', fcmError);
+            // لا نريد أن نفشل العملية إذا فشل FCM
+        }
 
         res.json({
             success: true,
@@ -724,6 +744,16 @@ adminRouter.post('/admin/assign-driver/:orderId/:driverId', admin, async (req, r
         await driver.save();
 
         console.log(`✅ تم تعيين السائق ${driver.name} للطلب ${order._id}`);
+
+        // إرسال إشعار FCM للمندوب عند تعيينه للطلب
+        try {
+            const { sendDeliveryAssignmentNotification } = require('./fcm_admin');
+            await sendDeliveryAssignmentNotification(order._id.toString(), driver._id.toString());
+            console.log('✅ FCM delivery assignment notification sent to delivery person');
+        } catch (fcmError) {
+            console.error('❌ Error sending FCM delivery assignment notification:', fcmError);
+            // لا نريد أن نفشل العملية إذا فشل FCM
+        }
 
         res.json({
             success: true,

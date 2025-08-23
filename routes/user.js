@@ -480,8 +480,15 @@ userRouter.post('/api/order/notify-restaurant', auth, async (req, res) => {
       console.log(`🔔 Notifying admin: ${admin.name} (${admin.email})`);
     });
 
-    // هنا يمكن إضافة إرسال push notifications أو emails
-    // يمكن استخدام Firebase Cloud Messaging أو SendGrid أو أي خدمة أخرى
+    // إرسال FCM push notification لصاحب المطعم
+    try {
+      const { sendNewOrderNotification } = require('./fcm_admin');
+      await sendNewOrderNotification(orderId, restaurantId);
+      console.log('✅ FCM push notification sent successfully');
+    } catch (fcmError) {
+      console.error('❌ Error sending FCM push notification:', fcmError);
+      // لا نريد أن نفشل العملية إذا فشل FCM
+    }
 
     res.json({ 
       success: true, 

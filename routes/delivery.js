@@ -483,6 +483,16 @@ deliveryRouter.put('/delivery/update-order-status/:orderId', auth, async (req, r
 
         await order.save();
 
+        // إرسال إشعار FCM للمشتري عند تحديث حالة الطلب
+        try {
+            const { sendOrderStatusNotification } = require('./fcm_admin');
+            await sendOrderStatusNotification(order._id.toString(), order.userId.toString(), status);
+            console.log('✅ FCM status update notification sent to customer');
+        } catch (fcmError) {
+            console.error('❌ Error sending FCM status update notification:', fcmError);
+            // لا نريد أن نفشل العملية إذا فشل FCM
+        }
+
         res.json({ 
             success: true, 
             message: 'Order status updated successfully',
