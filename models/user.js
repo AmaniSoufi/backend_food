@@ -7,18 +7,10 @@ const userSchema = mongoose.Schema({
         required : true ,
         type : String ,
     } ,
-    email : {
-        required : true ,
-        type : String ,
-        trim : true ,
-        validate : {
-            validator : (value) => {
-                const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-                return value.match(re);
-            },
-            message : 'Please enter a vaild email adress'
-        }
-    } ,
+    isPhoneVerified: {
+        type: Boolean,
+        default: false
+    },
     password: {
         required: true,
         type: String
