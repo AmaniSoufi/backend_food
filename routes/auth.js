@@ -75,6 +75,13 @@ authRouter.post('/api/signup', async (req, res) => {
       return res.status(400).json({msg: 'User with the same email exist'});
     }
     
+    // Check if phone number already exists
+    const existPhone = await User.findOne({phone});
+    if (existPhone) {
+      console.log('❌ User already exists with phone:', phone);
+      return res.status(400).json({msg: 'User with the same phone number exist'});
+    }
+    
     console.log('Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log('Password hashed successfully, hash length:', hashedPassword.length);
@@ -167,6 +174,36 @@ authRouter.get('/' , auth , async (req , res) => {
   
 
 } )
+
+// Check if phone number exists
+authRouter.post('/api/check-phone', async (req, res) => {
+  console.log('🔍 Check phone route hit');
+  console.log('📱 Phone to check:', req.body.phone);
+  
+  try {
+    const {phone} = req.body;
+    
+    if (!phone) {
+      console.log('❌ No phone provided');
+      return res.status(400).json({msg: 'Phone number is required'});
+    }
+    
+    const existPhone = await User.findOne({phone});
+    console.log('📱 Phone exists:', existPhone ? 'Yes' : 'No');
+    
+    if (existPhone) {
+      console.log('❌ Phone number already exists');
+      return res.status(400).json({msg: 'User with the same phone number exist'});
+    } else {
+      console.log('✅ Phone number is available');
+      return res.json({exists: false, msg: 'Phone number is available'});
+    }
+    
+  } catch (error) {
+    console.log('❌ Check phone error:', error);
+    return res.status(500).json({msg: 'Server error', error: error.message});
+  }
+});
 
 console.log('All routes registered');
 module.exports = authRouter;
