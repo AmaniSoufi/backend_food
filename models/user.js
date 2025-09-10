@@ -8,11 +8,12 @@ const userSchema = mongoose.Schema({
         type : String ,
     } ,
     email : {
-        required : true ,
+        required : false ,
         type : String ,
         trim : true ,
         validate : {
             validator : (value) => {
+                if (!value || value.trim() === '') return true; // Allow empty email
                 const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
                 return value.match(re);
             },

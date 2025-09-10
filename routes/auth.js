@@ -13,19 +13,19 @@ authRouter.post('/api/signin', async (req, res) => {
   console.log('Request body:', req.body);
   
   try {
-    const {email, password, phone} = req.body; // phone is optional for signin
+    const {phone, password} = req.body; // phone is required for signin
     
     // Debug logging
-    console.log('Email from request:', email);
+    console.log('Phone from request:', phone);
     console.log('Password from request:', password);
     console.log('Password length:', password?.length);
     
-    const user = await User.findOne({email});
+    const user = await User.findOne({phone});
     console.log('User found:', user ? 'Yes' : 'No');
     
     if (!user) {
-      console.log('❌ User not found with email:', email);
-      return res.status(400).json({msg: "User with this email doesn't exist"});
+      console.log('❌ User not found with phone:', phone);
+      return res.status(400).json({msg: "User with this phone number doesn't exist"});
     }
     
     console.log('Stored password hash:', user.password);
@@ -58,21 +58,15 @@ authRouter.post('/api/signup', async (req, res) => {
   console.log('🔥 Request headers:', req.headers);
   
   try {
-    const {name, email, password, phone, type, restaurantName} = req.body;
+    const {name, password, phone, type, restaurantName} = req.body;
     
     // Debug logging for signup
-    console.log('🔥 Signup data - Name:', name, 'Email:', email, 'Password length:', password?.length, 'Type:', type, 'RestaurantName:', restaurantName);
+    console.log('🔥 Signup data - Name:', name, 'Password length:', password?.length, 'Type:', type, 'RestaurantName:', restaurantName);
     console.log('🔥 Type check:', type === 'admin' ? 'IS ADMIN' : 'NOT ADMIN');
     
-    if (!name || !email || !password || !phone) {
+    if (!name || !password || !phone) {
       console.log('❌ Missing required fields');
       return res.status(400).json({msg: 'Missing required fields'});
-    }
-    
-    const existUser = await User.findOne({email});
-    if (existUser) {
-      console.log('❌ User already exists with email:', email);
-      return res.status(400).json({msg: 'User with the same email exist'});
     }
     
     // Check if phone number already exists
@@ -87,7 +81,6 @@ authRouter.post('/api/signup', async (req, res) => {
     console.log('Password hashed successfully, hash length:', hashedPassword.length);
     
     let userData = {
-      email,
       password: hashedPassword,
       name,
       phone,
