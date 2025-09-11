@@ -11,6 +11,7 @@ const userSchema = mongoose.Schema({
         required : false ,
         type : String ,
         trim : true ,
+        default : '', // Set default empty string instead of null
         validate : {
             validator : (value) => {
                 if (!value || value.trim() === '') return true; // Allow empty email

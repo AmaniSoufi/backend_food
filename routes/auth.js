@@ -84,6 +84,7 @@ authRouter.post('/api/signup', async (req, res) => {
       password: hashedPassword,
       name,
       phone,
+      email: '', // Set empty email to avoid null values
       type: type || 'user',
     };
     
