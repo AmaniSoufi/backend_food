@@ -7,28 +7,73 @@ const fcmAdminRouter = express.Router();
 // Initialize Firebase Admin SDK
 // Try to load from environment variables first, then from file
 let serviceAccount;
+let firebaseInitialized = false;
+
 try {
   // Try to load from environment variables (for production)
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     console.log('✅ Firebase Admin SDK initialized from environment variables');
+    firebaseInitialized = true;
   } else {
     // Try to load from file (for development)
-    serviceAccount = require('../serviceAccountKey.json');
-    console.log('✅ Firebase Admin SDK initialized from serviceAccountKey.json');
+    try {
+      serviceAccount = require('../serviceAccountKey.json');
+      console.log('✅ Firebase Admin SDK initialized from serviceAccountKey.json');
+      firebaseInitialized = true;
+    } catch (fileError) {
+      console.log('⚠️ serviceAccountKey.json not found, trying alternative paths...');
+      
+      // Try alternative paths for Render
+      const path = require('path');
+      const fs = require('fs');
+      
+      const possiblePaths = [
+        path.join(__dirname, '../serviceAccountKey.json'),
+        path.join(__dirname, '../../serviceAccountKey.json'),
+        path.join(process.cwd(), 'serviceAccountKey.json'),
+        path.join(process.cwd(), 'server/serviceAccountKey.json'),
+      ];
+      
+      for (const filePath of possiblePaths) {
+        try {
+          if (fs.existsSync(filePath)) {
+            serviceAccount = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            console.log(`✅ Firebase Admin SDK initialized from: ${filePath}`);
+            firebaseInitialized = true;
+            break;
+          }
+        } catch (pathError) {
+          console.log(`⚠️ Could not load from: ${filePath}`);
+        }
+      }
+    }
   }
 } catch (error) {
   console.log('❌ Firebase Admin SDK initialization failed');
+  console.log('📝 Error details:', error.message);
   console.log('📝 Please set FIREBASE_SERVICE_ACCOUNT environment variable in Render');
   console.log('📝 Or place serviceAccountKey.json in: server/serviceAccountKey.json');
+  console.log('📝 Current working directory:', process.cwd());
+  console.log('📝 Available files in current directory:', require('fs').readdirSync(process.cwd()));
 }
 
-if (serviceAccount) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: 'food-64e2d'
-  });
-  console.log('✅ Firebase Admin SDK initialized');
+if (serviceAccount && firebaseInitialized) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      projectId: 'food-64e2d'
+    });
+    console.log('✅ Firebase Admin SDK initialized successfully');
+    console.log('✅ Project ID: food-64e2d');
+    console.log('✅ Service Account Email:', serviceAccount.client_email);
+  } catch (initError) {
+    console.log('❌ Firebase Admin SDK initialization failed:', initError.message);
+    firebaseInitialized = false;
+  }
+} else {
+  console.log('❌ Firebase Admin SDK not initialized - no service account found');
+  console.log('📝 Firebase notifications will not work until this is fixed');
 }
 
 // Save FCM token for user
@@ -66,8 +111,12 @@ fcmAdminRouter.post('/api/save-fcm-token', auth, async (req, res) => {
 // Send notification using Admin SDK
 fcmAdminRouter.post('/api/send-notification', auth, async (req, res) => {
   try {
-    if (!admin.apps.length) {
-      return res.status(500).json({ error: 'Firebase Admin SDK not initialized' });
+    if (!firebaseInitialized || !admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send notification');
+      return res.status(500).json({ 
+        error: 'Firebase Admin SDK not initialized',
+        details: 'Please check Firebase configuration'
+      });
     }
 
     const { userId, title, body, data, type } = req.body;
@@ -127,8 +176,12 @@ fcmAdminRouter.post('/api/send-notification', auth, async (req, res) => {
 // Send notification to topic
 fcmAdminRouter.post('/api/send-topic-notification', auth, async (req, res) => {
   try {
-    if (!admin.apps.length) {
-      return res.status(500).json({ error: 'Firebase Admin SDK not initialized' });
+    if (!firebaseInitialized || !admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send topic notification');
+      return res.status(500).json({ 
+        error: 'Firebase Admin SDK not initialized',
+        details: 'Please check Firebase configuration'
+      });
     }
 
     const { topic, title, body, data, type } = req.body;
@@ -190,6 +243,12 @@ async function sendNewOrderNotification(orderId, restaurantId) {
     console.log('🔔 SENDING NEW ORDER NOTIFICATION...');
     console.log('🔔 Order ID:', orderId);
     console.log('🔔 Restaurant ID:', restaurantId);
+    
+    // Check if Firebase is initialized
+    if (!firebaseInitialized) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send new order notification');
+      return;
+    }
 
     // Get restaurant admin
     const restaurant = await User.findOne({ 
@@ -313,7 +372,10 @@ async function sendNotificationWithServerKey(fcmToken, title, body, data) {
 // Send notification when order status changes
 async function sendOrderStatusNotification(orderId, userId, status) {
   try {
-    if (!admin.apps.length) return;
+    if (!firebaseInitialized || !admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send order status notification');
+      return;
+    }
 
     const user = await User.findById(userId);
     if (!user || !user.fcmToken) return;
@@ -372,7 +434,10 @@ async function sendOrderStatusNotification(orderId, userId, status) {
 // Send notification to delivery person when order is assigned
 async function sendDeliveryAssignmentNotification(orderId, deliveryId) {
   try {
-    if (!admin.apps.length) return;
+    if (!firebaseInitialized || !admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send delivery assignment notification');
+      return;
+    }
 
     const delivery = await User.findById(deliveryId);
     if (!delivery || !delivery.fcmToken) return;
@@ -421,7 +486,10 @@ async function sendDeliveryAssignmentNotification(orderId, deliveryId) {
 // Send notification to all delivery persons
 async function sendDeliveryBroadcastNotification(title, body, data = {}) {
   try {
-    if (!admin.apps.length) return;
+    if (!firebaseInitialized || !admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send delivery broadcast notification');
+      return;
+    }
 
     const message = {
       topic: 'delivery_orders',
