@@ -187,8 +187,6 @@ fcmAdminRouter.post('/api/send-topic-notification', auth, async (req, res) => {
 // Send notification when new order is placed
 async function sendNewOrderNotification(orderId, restaurantId) {
   try {
-    if (!admin.apps.length) return;
-
     console.log('🔔 SENDING NEW ORDER NOTIFICATION...');
     console.log('🔔 Order ID:', orderId);
     console.log('🔔 Restaurant ID:', restaurantId);
@@ -203,91 +201,112 @@ async function sendNewOrderNotification(orderId, restaurantId) {
     console.log('🔔 FCM Token exists:', restaurant?.fcmToken ? 'YES' : 'NO');
 
     if (restaurant && restaurant.fcmToken) {
-      // Send to specific user token
-      const message = {
-        token: restaurant.fcmToken,
-        notification: {
-          title: 'طلب جديد! 🍕',
-          body: 'لديك طلب جديد ينتظر التأكيد',
-        },
-        data: {
-          type: 'new_order',
-          orderId: orderId,
-          restaurantId: restaurantId,
-        },
-        android: {
-          priority: 'high',
-          notification: {
-            channelId: 'food_delivery_channel',
-            priority: 'high',
-            defaultSound: true,
-            defaultVibrateTimings: true,
-            icon: '@mipmap/ic_launcher',
-          },
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-              badge: 1,
-              alert: {
-                title: 'طلب جديد! 🍕',
-                body: 'لديك طلب جديد ينتظر التأكيد',
-              },
-            },
-          },
-        },
-      };
-
-      const response = await admin.messaging().send(message);
-      console.log(`✅ New order notification sent to restaurant: ${restaurant.email}`);
-      console.log(`✅ FCM Response: ${response}`);
-    } else {
-      // Fallback: Send to admin topic
-      console.log('🔄 No FCM token found, sending to admin topic...');
+      // Use FCM Server Key if available, otherwise use Admin SDK
+      const FCM_SERVER_KEY = process.env.FCM_SERVER_KEY;
       
-      const message = {
-        topic: 'admin',
-        notification: {
-          title: 'طلب جديد! 🍕',
-          body: 'لديك طلب جديد ينتظر التأكيد',
-        },
-        data: {
-          type: 'new_order',
-          orderId: orderId,
-          restaurantId: restaurantId,
-        },
-        android: {
-          priority: 'high',
+      if (FCM_SERVER_KEY) {
+        console.log('🔔 Using FCM Server Key method...');
+        await sendNotificationWithServerKey(
+          restaurant.fcmToken,
+          'طلب جديد! 🍕',
+          'لديك طلب جديد ينتظر التأكيد',
+          {
+            type: 'new_order',
+            orderId: orderId,
+            restaurantId: restaurantId,
+          }
+        );
+      } else if (admin.apps.length) {
+        console.log('🔔 Using Firebase Admin SDK...');
+        // Send to specific user token
+        const message = {
+          token: restaurant.fcmToken,
           notification: {
-            channelId: 'food_delivery_channel',
-            priority: 'high',
-            defaultSound: true,
-            defaultVibrateTimings: true,
-            icon: '@mipmap/ic_launcher',
+            title: 'طلب جديد! 🍕',
+            body: 'لديك طلب جديد ينتظر التأكيد',
           },
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-              badge: 1,
-              alert: {
-                title: 'طلب جديد! 🍕',
-                body: 'لديك طلب جديد ينتظر التأكيد',
+          data: {
+            type: 'new_order',
+            orderId: orderId,
+            restaurantId: restaurantId,
+          },
+          android: {
+            priority: 'high',
+            notification: {
+              channelId: 'food_delivery_channel',
+              priority: 'high',
+              defaultSound: true,
+              defaultVibrateTimings: true,
+              icon: '@mipmap/ic_launcher',
+            },
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: 'default',
+                badge: 1,
+                alert: {
+                  title: 'طلب جديد! 🍕',
+                  body: 'لديك طلب جديد ينتظر التأكيد',
+                },
               },
             },
           },
-        },
-      };
+        };
 
-      const response = await admin.messaging().send(message);
-      console.log(`✅ New order notification sent to admin topic`);
-      console.log(`✅ FCM Response: ${response}`);
+        const response = await admin.messaging().send(message);
+        console.log(`✅ New order notification sent to restaurant: ${restaurant.email}`);
+        console.log(`✅ FCM Response: ${response}`);
+      } else {
+        console.log('❌ No FCM_SERVER_KEY and Firebase Admin SDK not initialized');
+      }
+    } else {
+      console.log('❌ No restaurant admin found or no FCM token');
     }
   } catch (error) {
     console.error('❌ Error sending new order notification:', error);
     console.error('❌ Error details:', error.message);
+  }
+}
+
+// Send notification using FCM Server Key
+async function sendNotificationWithServerKey(fcmToken, title, body, data) {
+  try {
+    const FCM_SERVER_KEY = process.env.FCM_SERVER_KEY;
+    
+    if (!FCM_SERVER_KEY) {
+      console.log('❌ FCM_SERVER_KEY not found in environment variables');
+      return;
+    }
+
+    console.log('🔔 Sending notification with FCM Server Key...');
+    console.log('🔔 FCM Token:', fcmToken);
+    console.log('🔔 Title:', title);
+    console.log('🔔 Body:', body);
+
+    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `key=${FCM_SERVER_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: fcmToken,
+        notification: {
+          title: title,
+          body: body,
+        },
+        data: data,
+        priority: 'high',
+      }),
+    });
+
+    const result = await response.json();
+    console.log('✅ FCM notification sent successfully:', result);
+    return result;
+  } catch (error) {
+    console.error('❌ Error sending FCM notification with Server Key:', error);
+    throw error;
   }
 }
 

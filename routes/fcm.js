@@ -153,8 +153,8 @@ fcmRouter.post('/api/send-topic-notification', auth, async (req, res) => {
 // Helper function to send FCM notification message
 async function sendFCMNotification(notification) {
   try {
-    // You'll need to get your FCM server key from Firebase Console
-    const FCM_SERVER_KEY = process.env.FCM_SERVER_KEY || 'YOUR_FCM_SERVER_KEY';
+    // Get FCM server key from environment variables or use your actual key
+    const FCM_SERVER_KEY = process.env.FCM_SERVER_KEY || 'AIzaSyBcbF8aDwcydSevWFW7YxZRVspFI01iq64';
     
     const response = await fetch('https://fcm.googleapis.com/fcm/send', {
       method: 'POST',
