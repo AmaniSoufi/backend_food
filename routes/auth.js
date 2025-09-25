@@ -13,14 +13,39 @@ authRouter.post('/api/signin', async (req, res) => {
   console.log('Request body:', req.body);
   
   try {
-    const {phone, password} = req.body; // phone is required for signin
+    let {phone, password} = req.body; // phone is required for signin
     
     // Debug logging
     console.log('Phone from request:', phone);
     console.log('Password from request:', password);
     console.log('Password length:', password?.length);
     
-    const user = await User.findOne({phone});
+    // Normalize phone to handle leading zero, country code, and spaces
+    const rawPhone = (phone || '').toString().trim();
+    const onlyDigits = rawPhone.replace(/\D/g, '');
+    const withLeadingZero = onlyDigits.startsWith('0') ? onlyDigits : `0${onlyDigits}`;
+    const withoutLeadingZero = onlyDigits.startsWith('0') ? onlyDigits.substring(1) : onlyDigits;
+    // Algeria example country code (213). Adjust or extend as needed.
+    const withCountryCode = onlyDigits.startsWith('213') ? onlyDigits : `213${withoutLeadingZero}`;
+
+    console.log('Normalized phones to try:', {
+      rawPhone,
+      onlyDigits,
+      withLeadingZero,
+      withoutLeadingZero,
+      withCountryCode,
+    });
+
+    const user = await User.findOne({
+      $or: [
+        { phone: rawPhone },
+        { phone: onlyDigits },
+        { phone: withLeadingZero },
+        { phone: withoutLeadingZero },
+        { phone: `+${withCountryCode}` },
+        { phone: withCountryCode },
+      ],
+    });
     console.log('User found:', user ? 'Yes' : 'No');
     
     if (!user) {
