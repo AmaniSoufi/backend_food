@@ -4,6 +4,7 @@ const { Product } = require('../models/product');
 const User = require('../models/user');
 const Order = require('../models/order');
 const userRouter = express.Router();
+const { createNotification } = require('./notification.js');
 
 // Add to cart
 userRouter.post('/api/add-to-cart', auth, async (req, res) => {
@@ -281,6 +282,32 @@ userRouter.post('/api/order', auth, async (req, res) => {
           console.log('✅ FCM notification sent successfully');
         } catch (fcmError) {
           console.error('❌ Error sending FCM notification:', fcmError);
+        }
+        
+        // Also create DB notifications so they appear in notifications collection
+        try {
+          let createdCount = 0;
+          for (const admin of adminUsers) {
+            const notification = await createNotification(
+              admin._id,
+              'order',
+              'طلب جديد! 🍕',
+              `طلب جديد بقيمة ${totalPrice} DA`,
+              order._id,
+              restaurant._id,
+              {
+                deliveryAddress: address,
+                deliveryDistance,
+                deliveryPrice,
+                totalAmount: totalPrice,
+                restaurantName: restaurant.name,
+              }
+            );
+            if (notification) createdCount += 1;
+          }
+          console.log(`🔔 Notifications Created (DB): ${createdCount}`);
+        } catch (dbErr) {
+          console.error('❌ Failed to create DB notifications:', dbErr);
         }
         
         adminUsers.forEach(admin => {

@@ -247,19 +247,42 @@ async function sendNewOrderNotification(orderId, restaurantId) {
     // Check if Firebase is initialized
     if (!firebaseInitialized) {
       console.log('❌ Firebase Admin SDK not initialized - cannot send new order notification');
-      return;
+      console.log('🔧 Attempting to initialize Firebase Admin SDK...');
+      
+      // Try to initialize Firebase Admin SDK
+      try {
+        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+          const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+          admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            projectId: 'food-64e2d'
+          });
+          firebaseInitialized = true;
+          console.log('✅ Firebase Admin SDK initialized from environment variables');
+        } else {
+          console.log('❌ No Firebase service account found in environment variables');
+          return;
+        }
+      } catch (initError) {
+        console.log('❌ Failed to initialize Firebase Admin SDK:', initError.message);
+        return;
+      }
     }
 
-    // Get restaurant admin
-    const restaurant = await User.findOne({ 
+    // Get all restaurant admins (not just one)
+    const restaurantAdmins = await User.find({ 
       restaurant: restaurantId, 
       type: 'admin' 
     });
 
-    console.log('🔔 Found restaurant admin:', restaurant ? restaurant.email : 'NOT FOUND');
-    console.log('🔔 FCM Token exists:', restaurant?.fcmToken ? 'YES' : 'NO');
+    console.log('🔔 Found restaurant admins:', restaurantAdmins.length);
+    restaurantAdmins.forEach((admin, index) => {
+      console.log(`🔔 Admin ${index + 1}: ${admin.email} - FCM Token: ${admin.fcmToken ? 'YES' : 'NO'}`);
+    });
 
-    if (restaurant && restaurant.fcmToken) {
+    // Send notification to all admins who have FCM tokens
+    for (const restaurant of restaurantAdmins) {
+      if (restaurant && restaurant.fcmToken) {
       // Use FCM Server Key if available, otherwise use Admin SDK
       const FCM_SERVER_KEY = process.env.FCM_SERVER_KEY;
       
@@ -319,8 +342,13 @@ async function sendNewOrderNotification(orderId, restaurantId) {
       } else {
         console.log('❌ No FCM_SERVER_KEY and Firebase Admin SDK not initialized');
       }
-    } else {
-      console.log('❌ No restaurant admin found or no FCM token');
+      } else {
+        console.log(`❌ Restaurant admin ${restaurant.email} has no FCM token`);
+      }
+    }
+    
+    if (restaurantAdmins.length === 0) {
+      console.log('❌ No restaurant admins found for this restaurant');
     }
   } catch (error) {
     console.error('❌ Error sending new order notification:', error);
