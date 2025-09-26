@@ -336,9 +336,24 @@ async function sendNewOrderNotification(orderId, restaurantId) {
           },
         };
 
-        const response = await admin.messaging().send(message);
-        console.log(`✅ New order notification sent to restaurant: ${restaurant.email}`);
-        console.log(`✅ FCM Response: ${response}`);
+        try {
+          const response = await admin.messaging().send(message);
+          console.log(`✅ New order notification sent to restaurant: ${restaurant.email}`);
+          console.log(`✅ FCM Response: ${response}`);
+        } catch (err) {
+          console.error('❌ Error sending new order notification:', err);
+          // If token is invalid/unregistered, clear it so app will re-register next launch
+          const code = (err && err.errorInfo && err.errorInfo.code) || err.code;
+          const message = (err && err.message) || '';
+          if (code === 'messaging/registration-token-not-registered' || message.includes('Requested entity was not found')) {
+            try {
+              await User.updateOne({ _id: restaurant._id }, { $unset: { fcmToken: '' } });
+              console.log(`🗑️ Cleared invalid FCM token for user ${restaurant.email}`);
+            } catch (clearErr) {
+              console.error('❌ Failed clearing invalid FCM token:', clearErr);
+            }
+          }
+        }
       } else {
         console.log('❌ No FCM_SERVER_KEY and Firebase Admin SDK not initialized');
       }
