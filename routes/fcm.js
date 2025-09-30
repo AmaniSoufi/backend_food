@@ -233,25 +233,39 @@ async function sendOrderStatusNotification(orderId, userId, status) {
     const totalAmount = order?.totalPrice?.toString?.() || '';
     const deliveryAddress = order?.address || '';
 
+    // Normalize status to string for mapping
+    const statusKey = String(status);
+
     const statusMessages = {
-      'confirmed': 'تم تأكيد طلبك! ✅',
+      // Numeric codes
+      '1': 'تم قبول طلبك! ✅',
+      '2': 'طلبك قيد التحضير 👨‍🍳',
+      '3': 'تم قبول طلبك من المندوب 🚗',
+      '5': 'تم رفض طلبك ❌',
+      '6': 'طلبك جاهز للاستلام 🚀',
+      '7': 'طلبك في الطريق إليك 🚗',
+      '8': 'تم تسليم طلبك 🎉',
+      '9': 'تم إلغاء طلبك ❌',
+      // String states (fallbacks)
+      'confirmed': 'تم قبول طلبك! ✅',
       'preparing': 'طلبك قيد التحضير 👨‍🍳',
       'ready': 'طلبك جاهز! 🚀',
       'delivering': 'طلبك في الطريق إليك 🚗',
       'delivered': 'تم توصيل طلبك! 🎉',
       'cancelled': 'تم إلغاء طلبك ❌',
+      'rejected': 'تم رفض طلبك ❌',
     };
 
     const notification = {
       token: user.fcmToken,
       notification: {
         title: 'تحديث حالة الطلب',
-        body: statusMessages[status] || 'تم تحديث حالة طلبك',
+        body: statusMessages[statusKey] || 'تم تحديث حالة طلبك',
       },
       data: {
         type: 'order_status_update',
         orderId: orderId,
-        status: String(status),
+        status: statusKey,
         totalAmount: totalAmount,
         deliveryAddress: deliveryAddress,
       },
@@ -272,7 +286,7 @@ async function sendOrderStatusNotification(orderId, userId, status) {
             badge: 1,
             alert: {
               title: 'تحديث حالة الطلب',
-              body: statusMessages[status] || 'تم تحديث حالة طلبك',
+              body: statusMessages[statusKey] || 'تم تحديث حالة طلبك',
             },
           },
         },
