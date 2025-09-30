@@ -2,6 +2,7 @@ const express = require('express');
 const auth = require('../middlewares/auth');
 const User = require('../models/user');
 const Order = require('../models/order');
+const admin = require('firebase-admin');
 const fcmRouter = express.Router();
 
 // Save FCM token for user
@@ -150,28 +151,16 @@ fcmRouter.post('/api/send-topic-notification', auth, async (req, res) => {
   }
 });
 
-// Helper function to send FCM notification message
-async function sendFCMNotification(notification) {
+// Helper function to send FCM notification message (via Firebase Admin SDK)
+async function sendFCMNotification(message) {
   try {
-    // Get FCM server key from environment variables or use your actual key
-    const FCM_SERVER_KEY = process.env.FCM_SERVER_KEY || 'AIzaSyBcbF8aDwcydSevWFW7YxZRVspFI01iq64';
-    
-    const response = await fetch('https://fcm.googleapis.com/fcm/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `key=${FCM_SERVER_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(notification),
-    });
-
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(`FCM Error: ${result.error}`);
+    if (!admin?.apps?.length) {
+      throw new Error('Firebase Admin SDK is not initialized');
     }
 
-    return result;
+    // Support token or topic messages
+    const response = await admin.messaging().send(message);
+    return { messageId: response };
   } catch (error) {
     console.error('❌ FCM Error:', error);
     throw error;
@@ -239,6 +228,11 @@ async function sendOrderStatusNotification(orderId, userId, status) {
     const user = await User.findById(userId);
     if (!user || !user.fcmToken) return;
 
+    // Enrich payload with order details
+    const order = await Order.findById(orderId).lean();
+    const totalAmount = order?.totalPrice?.toString?.() || '';
+    const deliveryAddress = order?.address || '';
+
     const statusMessages = {
       'confirmed': 'تم تأكيد طلبك! ✅',
       'preparing': 'طلبك قيد التحضير 👨‍🍳',
@@ -257,7 +251,9 @@ async function sendOrderStatusNotification(orderId, userId, status) {
       data: {
         type: 'order_status_update',
         orderId: orderId,
-        status: status,
+        status: String(status),
+        totalAmount: totalAmount,
+        deliveryAddress: deliveryAddress,
       },
       android: {
         priority: 'high',
