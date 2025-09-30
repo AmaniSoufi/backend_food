@@ -422,12 +422,41 @@ adminRouter.post("/admin/change-order-status", admin, async (req, res) => {
         
         // إرسال إشعار FCM للمشتري عند تحديث حالة الطلب
         try {
-            const { sendOrderStatusNotification } = require('./fcm_admin');
+            const { sendOrderStatusNotification } = require('./fcm');
             await sendOrderStatusNotification(order._id.toString(), order.userId.toString(), status);
             console.log('✅ FCM status update notification sent to customer');
         } catch (fcmError) {
             console.error('❌ Error sending FCM status update notification:', fcmError);
             // لا نريد أن نفشل العملية إذا فشل FCM
+        }
+        
+        // إنشاء إشعار في قاعدة البيانات للمشتري
+        try {
+            const { createNotification } = require('./notification.js');
+            const title = 'تحديث حالة الطلب';
+            const msgMap = {
+                1: 'تم تأكيد طلبك ✅',
+                2: 'طلبك قيد التحضير 👨‍🍳',
+                3: 'تم قبول طلبك من المندوب 🚗',
+                5: 'تم رفض طلبك ❌',
+                6: 'طلبك جاهز للاستلام 🚀',
+                7: 'طلبك في الطريق إليك 🚚',
+                8: 'تم تسليم طلبك 🎉',
+                9: 'تم إلغاء طلبك ❌',
+            };
+            const message = msgMap[Number(status)] || 'تم تحديث حالة طلبك';
+            await createNotification(
+                order.userId,
+                'status_update',
+                title,
+                message,
+                order._id,
+                order.restaurantId,
+                { status: Number(status) }
+            );
+            console.log('✅ DB status notification created for customer');
+        } catch (dbNotiErr) {
+            console.error('❌ Error creating DB status notification:', dbNotiErr);
         }
         
         res.json(orderObj);
