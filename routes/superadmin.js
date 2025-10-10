@@ -69,11 +69,20 @@ superadminRouter.get('/api/superadmin/users', superadmin, async (req, res) => {
     try {
         console.log('🔍 SuperAdmin requesting all users');
         
-        const users = await User.find({})
+        let users = await User.find({})
             .select('-password')
+            .populate('restaurant', 'name address') // ✅ جلب بيانات المطعم
             .sort({ createdAt: -1 });
 
-        console.log('✅ Found', users.length, 'users');
+        // ✅ ترتيب المستخدمين: المعلقين (pending) أولاً
+        users = users.sort((a, b) => {
+            const statusOrder = { 'pending': 0, 'rejected': 1, 'accepted': 2, 'active': 3 };
+            const statusA = statusOrder[a.status] ?? 3;
+            const statusB = statusOrder[b.status] ?? 3;
+            return statusA - statusB;
+        });
+
+        console.log('✅ Found', users.length, 'users (sorted: pending first)');
         res.json(users);
     } catch (error) {
         console.error('❌ Error fetching users:', error);
