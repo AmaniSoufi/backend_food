@@ -118,7 +118,7 @@ authRouter.post('/api/signup', async (req, res) => {
       password: hashedPassword,
       name,
       phone,
-      email: '', // Set empty email to avoid null values
+      email: `user_${phone}@app.com`, // ✅ جعل email فريد باستخدام رقم الهاتف
       type: type || 'user',
       address: '', // ✅ إضافة address
       cart: [], // ✅ إضافة cart فارغ
