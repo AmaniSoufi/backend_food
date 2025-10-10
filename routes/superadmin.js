@@ -149,6 +149,62 @@ superadminRouter.post('/api/superadmin/users/:userId/reject', superadmin, async 
 });
 
 // =====================================
+// Delete user (any type)
+// =====================================
+superadminRouter.delete('/api/superadmin/users/:userId', superadmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        console.log('🗑️ Deleting user:', userId);
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ msg: 'المستخدم غير موجود' });
+        }
+
+        console.log('🗑️ User found:', user.name, 'Type:', user.type);
+
+        // ✅ إذا كان المستخدم admin (صاحب مطعم)، احذف المطعم أيضاً
+        if (user.type === 'admin' && user.restaurant) {
+            try {
+                console.log('🗑️ Deleting associated restaurant:', user.restaurant);
+                await Restaurant.findByIdAndDelete(user.restaurant);
+                console.log('✅ Restaurant deleted successfully');
+            } catch (restaurantError) {
+                console.error('⚠️ Error deleting restaurant:', restaurantError);
+                // نكمل حذف المستخدم حتى لو فشل حذف المطعم
+            }
+        }
+
+        // ✅ حذف جميع الطلبات المرتبطة بالمستخدم (اختياري)
+        // يمكنك إلغاء التعليق إذا أردت حذف الطلبات أيضاً
+        /*
+        try {
+            await Order.deleteMany({ userId: userId });
+            console.log('✅ User orders deleted');
+        } catch (orderError) {
+            console.error('⚠️ Error deleting orders:', orderError);
+        }
+        */
+
+        // ✅ حذف المستخدم
+        await User.findByIdAndDelete(userId);
+        console.log('✅ User deleted successfully:', user.name);
+
+        res.json({ 
+            msg: 'تم حذف المستخدم بنجاح', 
+            deletedUser: {
+                id: user._id,
+                name: user.name,
+                type: user.type
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error deleting user:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =====================================
 // Get restaurants with stats
 // =====================================
 superadminRouter.get('/api/superadmin/restaurants/stats', superadmin, async (req, res) => {
