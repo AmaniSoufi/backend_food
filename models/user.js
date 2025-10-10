@@ -58,8 +58,8 @@ const userSchema = mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['pending', 'accepted', 'rejected'],
-        default: 'pending', // Only used for delivery
+        enum: ['pending', 'accepted', 'rejected', 'active'], // ✅ إضافة active للمستخدمين العاديين
+        default: 'accepted', // ✅ default للمستخدمين العاديين
     },
     // FCM Token for push notifications
     fcmToken: {

@@ -120,6 +120,9 @@ authRouter.post('/api/signup', async (req, res) => {
       phone,
       email: '', // Set empty email to avoid null values
       type: type || 'user',
+      address: '', // ✅ إضافة address
+      cart: [], // ✅ إضافة cart فارغ
+      status: 'accepted', // ✅ default status للمستخدمين العاديين (سيتم تغييره للمطاعم والديليفري)
     };
     
     // If user is admin (restaurant owner), create a restaurant for them
@@ -157,25 +160,50 @@ authRouter.post('/api/signup', async (req, res) => {
     }
     
     if (type === 'delivery') {
+      console.log('🔧 Setting delivery status to pending...');
       userData.status = 'pending';
       if (req.body.restaurantId) {
         userData.restaurant = req.body.restaurantId;
       }
+      console.log('✅ Delivery user data prepared');
     }
     
-    let user = new User(userData);
-    user = await user.save();
-    console.log('✅ User created successfully:', user._id);
+    console.log('🔧 Creating user with data:', JSON.stringify(userData, null, 2));
+    console.log('🔧 User data keys:', Object.keys(userData));
     
-    // ✅ إنشاء token للمستخدم الجديد
-    const token = jwt.sign({ id: user._id }, "passwordKey");
-    console.log('✅ Token created for new user');
-    
-    // ✅ إرجاع بيانات المستخدم مع Token
-    return res.json({
-      token,
-      ...user._doc
-    });
+    try {
+      let user = new User(userData);
+      console.log('🔧 User object created, saving to database...');
+      
+      user = await user.save();
+      console.log('✅ User created successfully:', user._id);
+      console.log('✅ User data:', JSON.stringify(user, null, 2));
+      
+      // ✅ إنشاء token للمستخدم الجديد
+      const token = jwt.sign({ id: user._id }, "passwordKey");
+      console.log('✅ Token created for new user');
+      
+      // ✅ إرجاع بيانات المستخدم مع Token
+      return res.json({
+        token,
+        ...user._doc
+      });
+    } catch (userSaveError) {
+      console.log('❌ Error saving user to database:', userSaveError);
+      console.log('❌ Error name:', userSaveError.name);
+      console.log('❌ Error message:', userSaveError.message);
+      console.log('❌ Error stack:', userSaveError.stack);
+      
+      // إذا كان المطعم تم إنشاءه، احذفه لتجنب المطاعم اليتيمة
+      if (type === 'admin' && userData.restaurant) {
+        console.log('🗑️ Cleaning up restaurant since user creation failed...');
+        const Restaurant = require('../models/restaurant');
+        await Restaurant.findByIdAndDelete(userData.restaurant);
+        console.log('🗑️ Restaurant deleted');
+      }
+      
+      throw userSaveError;
+    }
     
   } catch (error) {
     console.log('Signup Error:', error);
