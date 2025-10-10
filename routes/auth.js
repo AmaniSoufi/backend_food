@@ -56,8 +56,17 @@ authRouter.post('/api/signin', async (req, res) => {
     console.log('Stored password hash:', user.password);
     console.log('Comparing passwords...');
     
-    const isMatch = await bcrypt.compare(password, user.password);
-    console.log('Password match result:', isMatch);
+    let isMatch = false;
+    
+    try {
+      isMatch = await bcrypt.compare(password, user.password);
+      console.log('Password match result (bcrypt):', isMatch);
+    } catch (bcryptError) {
+      console.log('⚠️ bcrypt failed, trying bcryptjs...');
+      const bcryptjs = require('bcryptjs');
+      isMatch = await bcryptjs.compare(password, user.password);
+      console.log('Password match result (bcryptjs):', isMatch);
+    }
     
     if (!isMatch) {
       console.log('❌ Password comparison failed');
@@ -137,8 +146,9 @@ authRouter.post('/api/signup', async (req, res) => {
         
         // Assign the restaurant to the user
         userData.restaurant = savedRestaurant._id;
-        userData.status = 'accepted'; // Admin is automatically accepted
+        userData.status = 'pending'; // ✅ Admin needs approval from superadmin
         console.log('✅ User data updated with restaurant ID:', userData.restaurant);
+        console.log('✅ Admin status set to: pending (waiting for superadmin approval)');
       } catch (restaurantError) {
         console.log('❌ Error creating restaurant:', restaurantError);
         console.log('❌ Error stack:', restaurantError.stack);
