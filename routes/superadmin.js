@@ -205,6 +205,69 @@ superadminRouter.delete('/api/superadmin/users/:userId', superadmin, async (req,
 });
 
 // =====================================
+// Delete restaurant (with owner and all orders)
+// =====================================
+superadminRouter.delete('/api/superadmin/restaurants/:restaurantId', superadmin, async (req, res) => {
+    try {
+        const { restaurantId } = req.params;
+        console.log('🗑️ Deleting restaurant:', restaurantId);
+
+        const restaurant = await Restaurant.findById(restaurantId);
+        if (!restaurant) {
+            return res.status(404).json({ msg: 'المطعم غير موجود' });
+        }
+
+        console.log('🗑️ Restaurant found:', restaurant.name);
+
+        // ✅ 1. حذف صاحب المطعم (admin user)
+        try {
+            const owner = await User.findOne({ restaurant: restaurantId, type: 'admin' });
+            if (owner) {
+                console.log('🗑️ Deleting restaurant owner:', owner.name);
+                await User.findByIdAndDelete(owner._id);
+                console.log('✅ Restaurant owner deleted');
+            } else {
+                console.log('⚠️ No owner found for this restaurant');
+            }
+        } catch (ownerError) {
+            console.error('⚠️ Error deleting owner:', ownerError);
+        }
+
+        // ✅ 2. حذف جميع الطلبات المرتبطة بالمطعم
+        try {
+            const deletedOrders = await Order.deleteMany({ restaurantId: restaurantId });
+            console.log(`✅ Deleted ${deletedOrders.deletedCount} orders for restaurant`);
+        } catch (orderError) {
+            console.error('⚠️ Error deleting orders:', orderError);
+        }
+
+        // ✅ 3. حذف جميع المنتجات المرتبطة بالمطعم
+        try {
+            const Product = require('../models/product');
+            const deletedProducts = await Product.deleteMany({ restaurantId: restaurantId });
+            console.log(`✅ Deleted ${deletedProducts.deletedCount} products for restaurant`);
+        } catch (productError) {
+            console.error('⚠️ Error deleting products:', productError);
+        }
+
+        // ✅ 4. حذف المطعم نفسه
+        await Restaurant.findByIdAndDelete(restaurantId);
+        console.log('✅ Restaurant deleted successfully:', restaurant.name);
+
+        res.json({ 
+            msg: 'تم حذف المطعم وصاحبه وجميع الطلبات والمنتجات بنجاح', 
+            deletedRestaurant: {
+                id: restaurant._id,
+                name: restaurant.name
+            }
+        });
+    } catch (error) {
+        console.error('❌ Error deleting restaurant:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =====================================
 // Get restaurants with stats
 // =====================================
 superadminRouter.get('/api/superadmin/restaurants/stats', superadmin, async (req, res) => {
