@@ -167,7 +167,15 @@ authRouter.post('/api/signup', async (req, res) => {
     user = await user.save();
     console.log('✅ User created successfully:', user._id);
     
-    return res.json(user);
+    // ✅ إنشاء token للمستخدم الجديد
+    const token = jwt.sign({ id: user._id }, "passwordKey");
+    console.log('✅ Token created for new user');
+    
+    // ✅ إرجاع بيانات المستخدم مع Token
+    return res.json({
+      token,
+      ...user._doc
+    });
     
   } catch (error) {
     console.log('Signup Error:', error);
