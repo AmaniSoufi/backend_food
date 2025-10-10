@@ -240,6 +240,19 @@ authRouter.get('/' , auth , async (req , res) => {
 
 } )
 
+// Get user data (explicit route for /api/user)
+authRouter.get('/api/user', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({...user._doc, token: req.token});
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Check if phone number exists
 authRouter.post('/api/check-phone', async (req, res) => {
   console.log('🔍 Check phone route hit');
