@@ -9,6 +9,7 @@ const { notificationRouter } = require('./routes/notification.js');
 const { fcmRouter } = require('./routes/fcm.js');
 const { fcmAdminRouter } = require('./routes/fcm_admin.js');
 const deliveryRouter = require('./routes/delivery.js');
+const superadminRouter = require('./routes/superadmin.js');
 const app = express();
 const port = 3000;
 //middleware
@@ -39,6 +40,7 @@ app.use(notificationRouter);
 app.use(fcmRouter);
 app.use(fcmAdminRouter);
 app.use(deliveryRouter);
+app.use(superadminRouter);
 
 // Add restaurant router
 try {

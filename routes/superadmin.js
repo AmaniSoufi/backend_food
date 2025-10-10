@@ -4,6 +4,304 @@ const superadmin = require('../middlewares/superadmin');
 const Order = require('../models/order');
 const Restaurant = require('../models/restaurant');
 const User = require('../models/user');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
+// =====================================
+// Super Admin Login
+// =====================================
+superadminRouter.post('/api/superadmin/login', async (req, res) => {
+    try {
+        const { phone, password } = req.body;
+        console.log('📱 SuperAdmin login attempt for phone:', phone);
+
+        // Find user
+        const user = await User.findOne({ phone: phone });
+        if (!user) {
+            console.log('❌ User not found');
+            return res.status(400).json({ msg: 'رقم الهاتف أو كلمة السر غير صحيحة' });
+        }
+
+        console.log('✅ User found:', user.name, 'Type:', user.type);
+
+        // Check if user is superadmin
+        if (user.type !== 'superadmin') {
+            console.log('❌ User is not superadmin');
+            return res.status(403).json({ msg: 'ليس لديك صلاحية الدخول' });
+        }
+
+        // Check password
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            console.log('❌ Password mismatch');
+            return res.status(400).json({ msg: 'رقم الهاتف أو كلمة السر غير صحيحة' });
+        }
+
+        console.log('✅ Password matched!');
+
+        // Create JWT token
+        const token = jwt.sign({ id: user._id }, "passwordKey");
+        
+        // Return user data with token
+        res.json({
+            token: token,
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            type: user.type,
+            status: user.status,
+            address: user.address || '',
+            cart: user.cart || []
+        });
+
+        console.log('✅ SuperAdmin login successful!');
+    } catch (error) {
+        console.error('❌ Error in superadmin login:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =====================================
+// Get all users
+// =====================================
+superadminRouter.get('/api/superadmin/users', superadmin, async (req, res) => {
+    try {
+        console.log('🔍 SuperAdmin requesting all users');
+        
+        const users = await User.find({})
+            .select('-password')
+            .sort({ createdAt: -1 });
+
+        console.log('✅ Found', users.length, 'users');
+        res.json(users);
+    } catch (error) {
+        console.error('❌ Error fetching users:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =====================================
+// Approve user (for admins and delivery)
+// =====================================
+superadminRouter.post('/api/superadmin/users/:userId/approve', superadmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        console.log('✅ Approving user:', userId);
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ msg: 'المستخدم غير موجود' });
+        }
+
+        // Only admin and delivery users need approval
+        if (user.type !== 'admin' && user.type !== 'delivery') {
+            return res.status(400).json({ msg: 'هذا المستخدم لا يحتاج موافقة' });
+        }
+
+        user.status = 'accepted';
+        await user.save();
+
+        console.log('✅ User approved:', user.name);
+        res.json({ msg: 'تم قبول المستخدم بنجاح', user });
+    } catch (error) {
+        console.error('❌ Error approving user:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =====================================
+// Reject user (for admins and delivery)
+// =====================================
+superadminRouter.post('/api/superadmin/users/:userId/reject', superadmin, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        console.log('❌ Rejecting user:', userId);
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ msg: 'المستخدم غير موجود' });
+        }
+
+        // Only admin and delivery users need approval
+        if (user.type !== 'admin' && user.type !== 'delivery') {
+            return res.status(400).json({ msg: 'هذا المستخدم لا يحتاج موافقة' });
+        }
+
+        user.status = 'rejected';
+        await user.save();
+
+        console.log('❌ User rejected:', user.name);
+        res.json({ msg: 'تم رفض المستخدم', user });
+    } catch (error) {
+        console.error('❌ Error rejecting user:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =====================================
+// Get restaurants with stats
+// =====================================
+superadminRouter.get('/api/superadmin/restaurants/stats', superadmin, async (req, res) => {
+    try {
+        console.log('🔍 Requesting restaurants with stats');
+        
+        const restaurants = await Restaurant.find({});
+        const restaurantsWithStats = [];
+
+        for (const restaurant of restaurants) {
+            const orders = await Order.find({ restaurantId: restaurant._id, status: 8 }); // delivered orders
+            
+            const totalOrders = orders.length;
+            const totalRevenue = orders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+            const deliveryFees = orders.reduce((sum, order) => sum + (order.deliveryPrice || 0), 0);
+            const netRevenue = totalRevenue - deliveryFees;
+            const commission = netRevenue * 0.07;
+
+            // Get owner phone
+            const owner = await User.findOne({ type: 'admin', restaurant: restaurant._id });
+
+            restaurantsWithStats.push({
+                _id: restaurant._id,
+                name: restaurant.name,
+                address: restaurant.address,
+                phone: restaurant.phone || '',
+                ownerPhone: owner?.phone || '',
+                isActive: restaurant.isActive,
+                stats: {
+                    totalOrders,
+                    totalRevenue,
+                    netRevenue,
+                    commission
+                }
+            });
+        }
+
+        console.log('✅ Sending', restaurantsWithStats.length, 'restaurants with stats');
+        res.json(restaurantsWithStats);
+    } catch (error) {
+        console.error('❌ Error fetching restaurants with stats:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =====================================
+// Get deliveries with stats
+// =====================================
+superadminRouter.get('/api/superadmin/deliveries/stats', superadmin, async (req, res) => {
+    try {
+        console.log('🔍 Requesting deliveries with stats');
+        
+        const deliveryUsers = await User.find({ type: 'delivery' }).select('-password');
+        const deliveriesWithStats = [];
+
+        for (const delivery of deliveryUsers) {
+            const allOrders = await Order.find({ deliveryPerson: delivery._id });
+            const completedOrders = await Order.find({ deliveryPerson: delivery._id, status: 8 });
+            const pendingOrders = await Order.find({ 
+                deliveryPerson: delivery._id, 
+                status: { $in: [1, 2, 3, 4, 5, 6, 7] } 
+            });
+
+            const totalEarnings = completedOrders.reduce((sum, order) => sum + (order.deliveryPrice || 0), 0);
+
+            deliveriesWithStats.push({
+                _id: delivery._id,
+                name: delivery.name,
+                phone: delivery.phone,
+                email: delivery.email,
+                status: delivery.status,
+                stats: {
+                    totalDeliveries: allOrders.length,
+                    completedDeliveries: completedOrders.length,
+                    pendingDeliveries: pendingOrders.length,
+                    totalEarnings
+                }
+            });
+        }
+
+        console.log('✅ Sending', deliveriesWithStats.length, 'deliveries with stats');
+        res.json(deliveriesWithStats);
+    } catch (error) {
+        console.error('❌ Error fetching deliveries with stats:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// =====================================
+// Get overall platform stats
+// =====================================
+superadminRouter.get('/api/superadmin/stats/overview', superadmin, async (req, res) => {
+    try {
+        console.log('🔍 Requesting overall platform stats');
+        
+        // Platform stats
+        const totalUsers = await User.countDocuments({ type: 'user' });
+        const totalRestaurants = await Restaurant.countDocuments();
+        const totalDeliveries = await User.countDocuments({ type: 'delivery' });
+        const activeRestaurants = await Restaurant.countDocuments({ isActive: true });
+
+        // Orders stats
+        const totalOrders = await Order.countDocuments();
+        const completedOrders = await Order.countDocuments({ status: 8 });
+        const pendingOrders = await Order.countDocuments({ status: { $in: [0, 1, 2, 3, 4, 5, 6, 7] } });
+        const cancelledOrders = await Order.countDocuments({ status: 9 });
+
+        // Revenue stats
+        const completedOrdersList = await Order.find({ status: 8 });
+        const totalRevenue = completedOrdersList.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+        const deliveryFeesTotal = completedOrdersList.reduce((sum, order) => sum + (order.deliveryPrice || 0), 0);
+        const platformCommission = (totalRevenue - deliveryFeesTotal) * 0.07;
+        const restaurantsRevenue = (totalRevenue - deliveryFeesTotal) * 0.93;
+        const deliveriesRevenue = deliveryFeesTotal;
+
+        // Monthly stats
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        const monthlyOrders = await Order.find({
+            createdAt: { $gte: firstDayOfMonth, $lte: lastDayOfMonth },
+            status: 8
+        });
+
+        const thisMonthRevenue = monthlyOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+        const thisMonthDeliveryFees = monthlyOrders.reduce((sum, order) => sum + (order.deliveryPrice || 0), 0);
+        const thisMonthCommission = (thisMonthRevenue - thisMonthDeliveryFees) * 0.07;
+
+        const stats = {
+            platform: {
+                totalUsers,
+                totalRestaurants,
+                totalDeliveries,
+                activeRestaurants
+            },
+            orders: {
+                totalOrders,
+                completedOrders,
+                pendingOrders,
+                cancelledOrders
+            },
+            revenue: {
+                totalRevenue,
+                restaurantsRevenue,
+                deliveriesRevenue,
+                platformCommission
+            },
+            monthly: {
+                thisMonthRevenue,
+                thisMonthOrders: monthlyOrders.length,
+                thisMonthCommission
+            }
+        };
+
+        console.log('✅ Sending overall platform stats');
+        res.json(stats);
+    } catch (error) {
+        console.error('❌ Error fetching overall stats:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // Get all restaurants with their statistics
 superadminRouter.get('/superadmin/restaurants', superadmin, async (req, res) => {
