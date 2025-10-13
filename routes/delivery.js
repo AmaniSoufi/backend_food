@@ -111,6 +111,15 @@ deliveryRouter.post('/delivery/accept-order/:orderId', auth, async (req, res) =>
         deliveryPerson.isAvailable = false;
         await deliveryPerson.save();
 
+        // Send notification to restaurant admin about delivery acceptance
+        try {
+            const { sendDeliveryAcceptedNotificationToRestaurant } = require('./fcm_admin');
+            await sendDeliveryAcceptedNotificationToRestaurant(order._id.toString(), deliveryPerson._id.toString());
+            console.log('✅ Delivery accepted notification sent to restaurant');
+        } catch (fcmError) {
+            console.error('❌ Error sending delivery accepted notification to restaurant:', fcmError);
+        }
+
         res.json({ message: 'Order accepted successfully' });
     } catch (error) {
         console.error('Error accepting order:', error);
@@ -141,6 +150,7 @@ deliveryRouter.post('/delivery/reject-order/:orderId', auth, async (req, res) =>
         order.status = 4; // delivery_rejected
         order.deliveryRejectedAt = new Date();
         order.deliveryRejectionReason = reason;
+        const rejectedDeliveryId = order.deliveryPersonId; // Save before nulling
         order.deliveryPersonId = null;
         await order.save();
 
@@ -148,6 +158,15 @@ deliveryRouter.post('/delivery/reject-order/:orderId', auth, async (req, res) =>
         deliveryPerson.currentOrder = null;
         deliveryPerson.isAvailable = true;
         await deliveryPerson.save();
+
+        // Send notification to restaurant admin about delivery rejection
+        try {
+            const { sendDeliveryRejectedNotificationToRestaurant } = require('./fcm_admin');
+            await sendDeliveryRejectedNotificationToRestaurant(order._id.toString(), rejectedDeliveryId.toString(), reason);
+            console.log('✅ Delivery rejected notification sent to restaurant');
+        } catch (fcmError) {
+            console.error('❌ Error sending delivery rejected notification to restaurant:', fcmError);
+        }
 
         // Try to find another delivery person
         const availableDeliveryPersons = await User.find({

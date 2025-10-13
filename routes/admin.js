@@ -611,11 +611,15 @@ adminRouter.post('/admin/auto-assign-delivery/:orderId', admin, async (req, res)
 
         // إرسال إشعار FCM للمندوب عند تعيينه للطلب
         try {
-            const { sendDeliveryAssignmentNotification } = require('./fcm_admin');
+            const { sendDeliveryAssignmentNotification, sendDriverAssignedNotificationToRestaurant } = require('./fcm_admin');
             await sendDeliveryAssignmentNotification(order._id.toString(), nearestDelivery._id.toString());
             console.log('✅ FCM delivery assignment notification sent to delivery person');
+            
+            // إرسال إشعار للمطعم أيضاً
+            await sendDriverAssignedNotificationToRestaurant(order._id.toString(), nearestDelivery._id.toString());
+            console.log('✅ FCM driver assigned notification sent to restaurant');
         } catch (fcmError) {
-            console.error('❌ Error sending FCM delivery assignment notification:', fcmError);
+            console.error('❌ Error sending FCM notifications:', fcmError);
             // لا نريد أن نفشل العملية إذا فشل FCM
         }
 
@@ -776,11 +780,15 @@ adminRouter.post('/admin/assign-driver/:orderId/:driverId', admin, async (req, r
 
         // إرسال إشعار FCM للمندوب عند تعيينه للطلب
         try {
-            const { sendDeliveryAssignmentNotification } = require('./fcm_admin');
+            const { sendDeliveryAssignmentNotification, sendDriverAssignedNotificationToRestaurant } = require('./fcm_admin');
             await sendDeliveryAssignmentNotification(order._id.toString(), driver._id.toString());
             console.log('✅ FCM delivery assignment notification sent to delivery person');
+            
+            // إرسال إشعار للمطعم أيضاً
+            await sendDriverAssignedNotificationToRestaurant(order._id.toString(), driver._id.toString());
+            console.log('✅ FCM driver assigned notification sent to restaurant');
         } catch (fcmError) {
-            console.error('❌ Error sending FCM delivery assignment notification:', fcmError);
+            console.error('❌ Error sending FCM notifications:', fcmError);
             // لا نريد أن نفشل العملية إذا فشل FCM
         }
 

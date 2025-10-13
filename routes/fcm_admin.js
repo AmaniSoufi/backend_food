@@ -575,10 +575,242 @@ async function sendDeliveryBroadcastNotification(title, body, data = {}) {
   }
 }
 
+// Send notification to restaurant when delivery person accepts order
+async function sendDeliveryAcceptedNotificationToRestaurant(orderId, deliveryId) {
+  try {
+    if (!firebaseInitialized || !admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send notification');
+      return;
+    }
+
+    // Get order details
+    const order = await Order.findById(orderId);
+    if (!order) {
+      console.log('❌ Order not found');
+      return;
+    }
+
+    // Get delivery person details
+    const delivery = await User.findById(deliveryId);
+    if (!delivery) {
+      console.log('❌ Delivery person not found');
+      return;
+    }
+
+    // Get restaurant admin
+    const restaurant = await User.findOne({ 
+      restaurant: order.restaurant, 
+      type: 'admin' 
+    });
+
+    if (!restaurant || !restaurant.fcmToken) {
+      console.log('❌ Restaurant admin or FCM token not found');
+      return;
+    }
+
+    const message = {
+      token: restaurant.fcmToken,
+      notification: {
+        title: 'المندوب قبل الطلب! ✅',
+        body: `المندوب ${delivery.name} قبل طلب التوصيل`,
+      },
+      data: {
+        type: 'delivery_accepted',
+        orderId: orderId,
+        deliveryId: deliveryId,
+        deliveryName: delivery.name,
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'food_delivery_channel',
+          priority: 'high',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          icon: '@mipmap/ic_launcher',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+            alert: {
+              title: 'المندوب قبل الطلب! ✅',
+              body: `المندوب ${delivery.name} قبل طلب التوصيل`,
+            },
+          },
+        },
+      },
+    };
+
+    await admin.messaging().send(message);
+    console.log(`✅ Delivery accepted notification sent to restaurant: ${restaurant.email}`);
+  } catch (error) {
+    console.error('❌ Error sending delivery accepted notification to restaurant:', error);
+  }
+}
+
+// Send notification to restaurant when driver is assigned
+async function sendDriverAssignedNotificationToRestaurant(orderId, deliveryId) {
+  try {
+    if (!firebaseInitialized || !admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send notification');
+      return;
+    }
+
+    // Get order details
+    const order = await Order.findById(orderId);
+    if (!order) {
+      console.log('❌ Order not found');
+      return;
+    }
+
+    // Get delivery person details
+    const delivery = await User.findById(deliveryId);
+    if (!delivery) {
+      console.log('❌ Delivery person not found');
+      return;
+    }
+
+    // Get restaurant admin
+    const restaurant = await User.findOne({ 
+      restaurant: order.restaurant, 
+      type: 'admin' 
+    });
+
+    if (!restaurant || !restaurant.fcmToken) {
+      console.log('❌ Restaurant admin or FCM token not found');
+      return;
+    }
+
+    const message = {
+      token: restaurant.fcmToken,
+      notification: {
+        title: 'تم تعيين المندوب 🚗',
+        body: `تم تعيين المندوب ${delivery.name} للطلب`,
+      },
+      data: {
+        type: 'driver_assigned',
+        orderId: orderId,
+        deliveryId: deliveryId,
+        deliveryName: delivery.name,
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'food_delivery_channel',
+          priority: 'high',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          icon: '@mipmap/ic_launcher',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+            alert: {
+              title: 'تم تعيين المندوب 🚗',
+              body: `تم تعيين المندوب ${delivery.name} للطلب`,
+            },
+          },
+        },
+      },
+    };
+
+    await admin.messaging().send(message);
+    console.log(`✅ Driver assigned notification sent to restaurant: ${restaurant.email}`);
+  } catch (error) {
+    console.error('❌ Error sending driver assigned notification to restaurant:', error);
+  }
+}
+
+// Send notification to restaurant when delivery person rejects order
+async function sendDeliveryRejectedNotificationToRestaurant(orderId, deliveryId, reason) {
+  try {
+    if (!firebaseInitialized || !admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send notification');
+      return;
+    }
+
+    // Get order details
+    const order = await Order.findById(orderId);
+    if (!order) {
+      console.log('❌ Order not found');
+      return;
+    }
+
+    // Get delivery person details
+    const delivery = await User.findById(deliveryId);
+    if (!delivery) {
+      console.log('❌ Delivery person not found');
+      return;
+    }
+
+    // Get restaurant admin
+    const restaurant = await User.findOne({ 
+      restaurant: order.restaurant, 
+      type: 'admin' 
+    });
+
+    if (!restaurant || !restaurant.fcmToken) {
+      console.log('❌ Restaurant admin or FCM token not found');
+      return;
+    }
+
+    const message = {
+      token: restaurant.fcmToken,
+      notification: {
+        title: 'المندوب رفض الطلب ❌',
+        body: `المندوب ${delivery.name} رفض طلب التوصيل. ${reason ? `السبب: ${reason}` : ''}`,
+      },
+      data: {
+        type: 'delivery_rejected',
+        orderId: orderId,
+        deliveryId: deliveryId,
+        deliveryName: delivery.name,
+        reason: reason || '',
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'food_delivery_channel',
+          priority: 'high',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          icon: '@mipmap/ic_launcher',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+            alert: {
+              title: 'المندوب رفض الطلب ❌',
+              body: `المندوب ${delivery.name} رفض طلب التوصيل`,
+            },
+          },
+        },
+      },
+    };
+
+    await admin.messaging().send(message);
+    console.log(`✅ Delivery rejected notification sent to restaurant: ${restaurant.email}`);
+  } catch (error) {
+    console.error('❌ Error sending delivery rejected notification to restaurant:', error);
+  }
+}
+
 module.exports = { 
   fcmAdminRouter,
   sendNewOrderNotification,
   sendOrderStatusNotification,
   sendDeliveryAssignmentNotification,
   sendDeliveryBroadcastNotification,
+  sendDeliveryAcceptedNotificationToRestaurant,
+  sendDeliveryRejectedNotificationToRestaurant,
+  sendDriverAssignedNotificationToRestaurant,
 }; 
