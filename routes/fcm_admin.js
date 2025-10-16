@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middlewares/auth');
 const User = require('../models/user');
+const Order = require('../models/order');
 const admin = require('firebase-admin');
 const fcmAdminRouter = express.Router();
 
@@ -427,10 +428,11 @@ async function sendOrderStatusNotification(orderId, userId, status) {
       '1': 'تم تأكيد طلبك! ✅',
       '2': 'تم تعيين مندوب للطلب 🚗',
       '3': 'المندوب قبل طلبك 🚗',
-      '5': 'تم رفض طلبك ❌',
-      '6': 'المطعم يحضر طلبك الآن 👨‍🍳',
+      '4': 'المندوب رفض طلبك ❌',
+      '5': 'المطعم يحضر طلبك الآن 👨‍🍳',
+      '6': 'طلبك في الطريق إليك 🚚',
       '7': 'طلبك في الطريق إليك 🚚',
-      '8': 'تم توصيل طلبك! 🎉',
+      '8': 'تم تسليم طلبك! 🎉',
       '9': 'تم إلغاء طلبك ❌',
       // String fallbacks
       'confirmed': 'تم تأكيد طلبك! ✅',
@@ -587,6 +589,10 @@ async function sendDeliveryBroadcastNotification(title, body, data = {}) {
 // Send notification to restaurant when delivery person accepts order
 async function sendDeliveryAcceptedNotificationToRestaurant(orderId, deliveryId) {
   try {
+    console.log('🔔 SENDING DELIVERY ACCEPTED NOTIFICATION TO RESTAURANT...');
+    console.log('🔔 Order ID:', orderId);
+    console.log('🔔 Delivery ID:', deliveryId);
+    
     if (!firebaseInitialized || !admin.apps.length) {
       console.log('❌ Firebase Admin SDK not initialized - cannot send notification');
       return;
@@ -598,6 +604,7 @@ async function sendDeliveryAcceptedNotificationToRestaurant(orderId, deliveryId)
       console.log('❌ Order not found');
       return;
     }
+    console.log('🔔 Order found:', order.orderId, 'Restaurant ID:', order.restaurantId);
 
     // Get delivery person details
     const delivery = await User.findById(deliveryId);
@@ -605,17 +612,21 @@ async function sendDeliveryAcceptedNotificationToRestaurant(orderId, deliveryId)
       console.log('❌ Delivery person not found');
       return;
     }
+    console.log('🔔 Delivery person found:', delivery.name, delivery.email);
 
     // Get restaurant admin
     const restaurant = await User.findOne({ 
-      restaurant: order.restaurant, 
+      restaurant: order.restaurantId, 
       type: 'admin' 
     });
 
     if (!restaurant || !restaurant.fcmToken) {
       console.log('❌ Restaurant admin or FCM token not found');
+      console.log('🔔 Restaurant found:', restaurant ? 'YES' : 'NO');
+      console.log('🔔 FCM Token:', restaurant ? (restaurant.fcmToken ? 'YES' : 'NO') : 'N/A');
       return;
     }
+    console.log('🔔 Restaurant admin found:', restaurant.email, 'FCM Token:', restaurant.fcmToken ? 'YES' : 'NO');
 
     const message = {
       token: restaurant.fcmToken,
@@ -660,85 +671,14 @@ async function sendDeliveryAcceptedNotificationToRestaurant(orderId, deliveryId)
   }
 }
 
-// Send notification to restaurant when driver is assigned
-async function sendDriverAssignedNotificationToRestaurant(orderId, deliveryId) {
-  try {
-    if (!firebaseInitialized || !admin.apps.length) {
-      console.log('❌ Firebase Admin SDK not initialized - cannot send notification');
-      return;
-    }
-
-    // Get order details
-    const order = await Order.findById(orderId);
-    if (!order) {
-      console.log('❌ Order not found');
-      return;
-    }
-
-    // Get delivery person details
-    const delivery = await User.findById(deliveryId);
-    if (!delivery) {
-      console.log('❌ Delivery person not found');
-      return;
-    }
-
-    // Get restaurant admin
-    const restaurant = await User.findOne({ 
-      restaurant: order.restaurant, 
-      type: 'admin' 
-    });
-
-    if (!restaurant || !restaurant.fcmToken) {
-      console.log('❌ Restaurant admin or FCM token not found');
-      return;
-    }
-
-    const message = {
-      token: restaurant.fcmToken,
-      notification: {
-        title: 'تم تعيين المندوب 🚗',
-        body: `تم تعيين المندوب ${delivery.name} للطلب`,
-      },
-      data: {
-        type: 'driver_assigned',
-        orderId: orderId,
-        deliveryId: deliveryId,
-        deliveryName: delivery.name,
-      },
-      android: {
-        priority: 'high',
-        notification: {
-          channelId: 'food_delivery_channel',
-          priority: 'high',
-          defaultSound: true,
-          defaultVibrateTimings: true,
-          icon: '@mipmap/ic_launcher',
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            sound: 'default',
-            badge: 1,
-            alert: {
-              title: 'تم تعيين المندوب 🚗',
-              body: `تم تعيين المندوب ${delivery.name} للطلب`,
-            },
-          },
-        },
-      },
-    };
-
-    await admin.messaging().send(message);
-    console.log(`✅ Driver assigned notification sent to restaurant: ${restaurant.email}`);
-  } catch (error) {
-    console.error('❌ Error sending driver assigned notification to restaurant:', error);
-  }
-}
-
 // Send notification to restaurant when delivery person rejects order
 async function sendDeliveryRejectedNotificationToRestaurant(orderId, deliveryId, reason) {
   try {
+    console.log('🔔 SENDING DELIVERY REJECTED NOTIFICATION TO RESTAURANT...');
+    console.log('🔔 Order ID:', orderId);
+    console.log('🔔 Delivery ID:', deliveryId);
+    console.log('🔔 Reason:', reason);
+    
     if (!firebaseInitialized || !admin.apps.length) {
       console.log('❌ Firebase Admin SDK not initialized - cannot send notification');
       return;
@@ -750,6 +690,7 @@ async function sendDeliveryRejectedNotificationToRestaurant(orderId, deliveryId,
       console.log('❌ Order not found');
       return;
     }
+    console.log('🔔 Order found:', order.orderId, 'Restaurant ID:', order.restaurantId);
 
     // Get delivery person details
     const delivery = await User.findById(deliveryId);
@@ -757,23 +698,27 @@ async function sendDeliveryRejectedNotificationToRestaurant(orderId, deliveryId,
       console.log('❌ Delivery person not found');
       return;
     }
+    console.log('🔔 Delivery person found:', delivery.name, delivery.email);
 
     // Get restaurant admin
     const restaurant = await User.findOne({ 
-      restaurant: order.restaurant, 
+      restaurant: order.restaurantId, 
       type: 'admin' 
     });
 
     if (!restaurant || !restaurant.fcmToken) {
       console.log('❌ Restaurant admin or FCM token not found');
+      console.log('🔔 Restaurant found:', restaurant ? 'YES' : 'NO');
+      console.log('🔔 FCM Token:', restaurant ? (restaurant.fcmToken ? 'YES' : 'NO') : 'N/A');
       return;
     }
+    console.log('🔔 Restaurant admin found:', restaurant.email, 'FCM Token:', restaurant.fcmToken ? 'YES' : 'NO');
 
     const message = {
       token: restaurant.fcmToken,
       notification: {
-        title: 'المندوب رفض الطلب ❌',
-        body: `المندوب ${delivery.name} رفض طلب التوصيل. ${reason ? `السبب: ${reason}` : ''}`,
+        title: 'المندوب رفض الطلب! ❌',
+        body: `المندوب ${delivery.name} رفض طلب التوصيل${reason ? ` - السبب: ${reason}` : ''}`,
       },
       data: {
         type: 'delivery_rejected',
@@ -798,8 +743,8 @@ async function sendDeliveryRejectedNotificationToRestaurant(orderId, deliveryId,
             sound: 'default',
             badge: 1,
             alert: {
-              title: 'المندوب رفض الطلب ❌',
-              body: `المندوب ${delivery.name} رفض طلب التوصيل`,
+              title: 'المندوب رفض الطلب! ❌',
+              body: `المندوب ${delivery.name} رفض طلب التوصيل${reason ? ` - السبب: ${reason}` : ''}`,
             },
           },
         },
@@ -813,6 +758,91 @@ async function sendDeliveryRejectedNotificationToRestaurant(orderId, deliveryId,
   }
 }
 
+// Send notification to restaurant when driver is assigned
+async function sendDriverAssignedNotificationToRestaurant(orderId, deliveryId) {
+  try {
+    console.log('🔔 SENDING DRIVER ASSIGNED NOTIFICATION TO RESTAURANT...');
+    console.log('🔔 Order ID:', orderId);
+    console.log('🔔 Delivery ID:', deliveryId);
+    
+    if (!firebaseInitialized || !admin.apps.length) {
+      console.log('❌ Firebase Admin SDK not initialized - cannot send notification');
+      return;
+    }
+
+    // Get order details
+    const order = await Order.findById(orderId);
+    if (!order) {
+      console.log('❌ Order not found');
+      return;
+    }
+    console.log('🔔 Order found:', order.orderId, 'Restaurant ID:', order.restaurantId);
+
+    // Get delivery person details
+    const delivery = await User.findById(deliveryId);
+    if (!delivery) {
+      console.log('❌ Delivery person not found');
+      return;
+    }
+    console.log('🔔 Delivery person found:', delivery.name, delivery.email);
+
+    // Get restaurant admin
+    const restaurant = await User.findOne({ 
+      restaurant: order.restaurantId, 
+      type: 'admin' 
+    });
+
+    if (!restaurant || !restaurant.fcmToken) {
+      console.log('❌ Restaurant admin or FCM token not found');
+      console.log('🔔 Restaurant found:', restaurant ? 'YES' : 'NO');
+      console.log('🔔 FCM Token:', restaurant ? (restaurant.fcmToken ? 'YES' : 'NO') : 'N/A');
+      return;
+    }
+    console.log('🔔 Restaurant admin found:', restaurant.email, 'FCM Token:', restaurant.fcmToken ? 'YES' : 'NO');
+
+    const message = {
+      token: restaurant.fcmToken,
+      notification: {
+        title: 'تم تعيين المندوب! 🚗',
+        body: `تم تعيين المندوب ${delivery.name} للطلب بنجاح`,
+      },
+      data: {
+        type: 'driver_assigned',
+        orderId: orderId,
+        deliveryId: deliveryId,
+        deliveryName: delivery.name,
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'food_delivery_channel',
+          priority: 'high',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          icon: '@mipmap/ic_launcher',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+            alert: {
+              title: 'تم تعيين المندوب! 🚗',
+              body: `تم تعيين المندوب ${delivery.name} للطلب بنجاح`,
+            },
+          },
+        },
+      },
+    };
+
+    await admin.messaging().send(message);
+    console.log(`✅ Driver assigned notification sent to restaurant: ${restaurant.email}`);
+  } catch (error) {
+    console.error('❌ Error sending driver assigned notification to restaurant:', error);
+  }
+}
+
 module.exports = { 
   fcmAdminRouter,
   sendNewOrderNotification,
@@ -822,4 +852,4 @@ module.exports = {
   sendDeliveryAcceptedNotificationToRestaurant,
   sendDeliveryRejectedNotificationToRestaurant,
   sendDriverAssignedNotificationToRestaurant,
-}; 
+};
