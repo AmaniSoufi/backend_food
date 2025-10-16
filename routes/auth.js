@@ -183,6 +183,23 @@ authRouter.post('/api/signup', async (req, res) => {
       const token = jwt.sign({ id: user._id }, "passwordKey");
       console.log('✅ Token created for new user');
       
+      // Send notification to superadmin if user is admin or delivery
+      if (type === 'admin' || type === 'delivery') {
+        try {
+          const { sendNewRegistrationNotification } = require('./fcm');
+          await sendNewRegistrationNotification(
+            user._id.toString(),
+            type,
+            name,
+            phone
+          );
+          console.log('✅ Registration notification sent to superadmin');
+        } catch (notificationError) {
+          console.error('❌ Error sending registration notification:', notificationError);
+          // Don't fail the registration if notification fails
+        }
+      }
+      
       // ✅ إرجاع بيانات المستخدم مع Token
       return res.json({
         token,

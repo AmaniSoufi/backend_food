@@ -391,10 +391,81 @@ async function sendDeliveryBroadcastNotification(title, body, data = {}) {
   }
 }
 
+// Send notification to superadmin when new registration request is made
+async function sendNewRegistrationNotification(userId, userType, userName, userPhone) {
+  try {
+    // Find superadmin user
+    const superadmin = await User.findOne({ type: 'superadmin' });
+    
+    if (!superadmin || !superadmin.fcmToken) {
+      console.log('⚠️ Superadmin not found or no FCM token');
+      return;
+    }
+
+    // Prepare notification content based on user type
+    let title = '';
+    let body = '';
+    
+    if (userType === 'admin') {
+      title = 'طلب تسجيل مطعم جديد! 🏪';
+      body = `مطعم جديد يطلب الانضمام: ${userName} (${userPhone})`;
+    } else if (userType === 'delivery') {
+      title = 'طلب تسجيل مندوب توصيل جديد! 🚗';
+      body = `مندوب توصيل جديد يطلب الانضمام: ${userName} (${userPhone})`;
+    } else {
+      title = 'طلب تسجيل جديد! 👤';
+      body = `مستخدم جديد يطلب الانضمام: ${userName} (${userPhone})`;
+    }
+
+    const notification = {
+      token: superadmin.fcmToken,
+      notification: {
+        title: title,
+        body: body,
+      },
+      data: {
+        type: 'new_registration',
+        userId: userId,
+        userType: userType,
+        userName: userName,
+        userPhone: userPhone,
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'food_delivery_channel',
+          priority: 'high',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+          icon: '@mipmap/ic_launcher',
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+            alert: {
+              title: title,
+              body: body,
+            },
+          },
+        },
+      },
+    };
+
+    await sendFCMNotification(notification);
+    console.log(`✅ New registration notification sent to superadmin for ${userType}: ${userName}`);
+  } catch (error) {
+    console.error('❌ Error sending new registration notification:', error);
+  }
+}
+
 module.exports = {
   fcmRouter,
   sendNewOrderNotification,
   sendOrderStatusNotification,
   sendDeliveryAssignmentNotification,
   sendDeliveryBroadcastNotification,
+  sendNewRegistrationNotification,
 }; 
