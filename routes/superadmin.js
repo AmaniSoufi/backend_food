@@ -6,6 +6,7 @@ const Restaurant = require('../models/restaurant');
 const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { sendRegistrationApprovalNotification, sendRegistrationRejectionNotification } = require('./fcm');
 
 // =====================================
 // Super Admin Login
@@ -111,6 +112,15 @@ superadminRouter.post('/api/superadmin/users/:userId/approve', superadmin, async
         user.status = 'accepted';
         await user.save();
 
+        // Send approval notification to the user
+        try {
+            await sendRegistrationApprovalNotification(userId, user.name, user.type);
+            console.log('✅ Approval notification sent to user:', user.name);
+        } catch (notificationError) {
+            console.error('⚠️ Error sending approval notification:', notificationError);
+            // Don't fail the approval if notification fails
+        }
+
         console.log('✅ User approved:', user.name);
         res.json({ msg: 'تم قبول المستخدم بنجاح', user });
     } catch (error) {
@@ -139,6 +149,15 @@ superadminRouter.post('/api/superadmin/users/:userId/reject', superadmin, async 
 
         user.status = 'rejected';
         await user.save();
+
+        // Send rejection notification to the user
+        try {
+            await sendRegistrationRejectionNotification(userId, user.name, user.type);
+            console.log('✅ Rejection notification sent to user:', user.name);
+        } catch (notificationError) {
+            console.error('⚠️ Error sending rejection notification:', notificationError);
+            // Don't fail the rejection if notification fails
+        }
 
         console.log('❌ User rejected:', user.name);
         res.json({ msg: 'تم رفض المستخدم', user });
