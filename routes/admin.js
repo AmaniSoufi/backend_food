@@ -234,7 +234,7 @@ adminRouter.post('/admin/set-minimum-order-price', admin, async (req, res) => {
 // Public endpoint to get all restaurants
 adminRouter.get('/admin/get-all-restaurants', async (req, res) => {
     try {
-        const restaurants = await Restaurant.find({}).select('name address latitude longitude minimumOrderPrice isActive createdAt');
+        const restaurants = await Restaurant.find({}).select('name address latitude longitude minimumOrderPrice isActive logo createdAt');
         res.json(restaurants);
     } catch (e) {
         console.error('Error fetching restaurants:', e);
