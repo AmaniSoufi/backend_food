@@ -94,8 +94,8 @@ adminRouter.post('/admin/create-restaurant', async (req, res) => {
 adminRouter.post('/admin/update-restaurant-profile', admin, async (req, res) => {
     try {
         console.log('🔍 DEBUG: Update restaurant profile request body:', req.body);
-        const { name, openingTime, closingTime } = req.body;
-        console.log('🔍 DEBUG: Received data - name:', name, 'openingTime:', openingTime, 'closingTime:', closingTime);
+        const { name, openingTime, closingTime, logo } = req.body;
+        console.log('🔍 DEBUG: Received data - name:', name, 'openingTime:', openingTime, 'closingTime:', closingTime, 'logo:', logo ? 'present' : 'not present');
         
         const adminUser = await User.findById(req.user);
         console.log('🔍 DEBUG: Admin user:', adminUser);
@@ -125,6 +125,10 @@ adminRouter.post('/admin/update-restaurant-profile', admin, async (req, res) => 
         if (closingTime) {
             console.log('🔍 DEBUG: Updating closingTime from', restaurant.closingTime, 'to', closingTime);
             restaurant.closingTime = closingTime;
+        }
+        if (logo) {
+            console.log('🔍 DEBUG: Updating logo from', restaurant.logo ? 'existing' : 'none', 'to new logo');
+            restaurant.logo = logo;
         }
         
         console.log('🔍 DEBUG: Saving restaurant with updated data...');
