@@ -34,6 +34,10 @@ const restaurantSchema = mongoose.Schema({
     type: String,
     default: '22:00',
   },
+  logo: {
+    type: String,
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

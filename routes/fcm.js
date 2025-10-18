@@ -170,7 +170,7 @@ async function sendFCMNotification(message) {
 // Auto-notification functions for different events
 
 // Send notification when new order is placed
-async function sendNewOrderNotification(orderId, restaurantId, orderDetails = {}) {
+async function sendNewOrderNotification(orderId, restaurantId) {
   try {
     // Get restaurant admin
     const restaurant = await User.findOne({ 
@@ -179,27 +179,16 @@ async function sendNewOrderNotification(orderId, restaurantId, orderDetails = {}
     });
 
     if (restaurant && restaurant.fcmToken) {
-      // Get order details for rich notification
-      const order = await Order.findById(orderId).lean();
-      const totalAmount = order?.totalPrice?.toString() || orderDetails.totalAmount || '';
-      const deliveryAddress = order?.address || orderDetails.deliveryAddress || '';
-      const customerName = order?.userName || orderDetails.customerName || '';
-      const customerPhone = order?.userPhone || orderDetails.customerPhone || '';
-
       const notification = {
         token: restaurant.fcmToken,
         notification: {
           title: 'طلب جديد! 🍕',
-          body: `طلب جديد بقيمة ${totalAmount} دج من ${customerName}`,
+          body: 'لديك طلب جديد ينتظر التأكيد',
         },
         data: {
           type: 'new_order',
           orderId: orderId,
           restaurantId: restaurantId,
-          totalAmount: totalAmount,
-          deliveryAddress: deliveryAddress,
-          customerName: customerName,
-          customerPhone: customerPhone,
         },
         android: {
           priority: 'high',
