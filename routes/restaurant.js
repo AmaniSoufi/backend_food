@@ -240,6 +240,51 @@ router.get('/api/restaurant', auth, async (req, res) => {
   }
 });
 
+// Get restaurant location
+router.get('/api/restaurant/location', auth, async (req, res) => {
+  try {
+    console.log('📍 DEBUG: Getting restaurant location for user:', req.user);
+    
+    const user = await User.findById(req.user);
+    console.log('📍 DEBUG: User found:', user ? 'Yes' : 'No');
+    console.log('📍 DEBUG: User restaurant ID:', user?.restaurant);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (!user.restaurant) {
+      return res.status(404).json({ error: 'User is not associated with a restaurant' });
+    }
+
+    const restaurant = await Restaurant.findById(user.restaurant);
+    console.log('📍 DEBUG: Restaurant found:', restaurant ? 'Yes' : 'No');
+    console.log('📍 DEBUG: Restaurant location data:', {
+      latitude: restaurant?.latitude,
+      longitude: restaurant?.longitude,
+      address: restaurant?.address
+    });
+    
+    if (!restaurant) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+
+    // Return location data if available
+    if (restaurant.latitude && restaurant.longitude) {
+      res.json({
+        latitude: restaurant.latitude,
+        longitude: restaurant.longitude,
+        address: restaurant.address || ''
+      });
+    } else {
+      return res.status(404).json({ error: 'Restaurant location not set' });
+    }
+  } catch (e) {
+    console.log('📍 DEBUG: Error getting restaurant location:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Get restaurant products by restaurant ID
 router.get('/api/restaurant/:restaurantId/products', async (req, res) => {
   try {
