@@ -128,6 +128,21 @@ adminRouter.post('/admin/update-restaurant-profile', admin, async (req, res) => 
         }
         if (logo) {
             console.log('🔍 DEBUG: Updating logo from', restaurant.logo ? 'existing' : 'none', 'to new logo');
+            
+            // تحقق من حجم اللوغو (base64)
+            const logoSizeInBytes = Buffer.byteLength(logo, 'utf8');
+            const logoSizeInMB = logoSizeInBytes / (1024 * 1024);
+            console.log('🔍 DEBUG: Logo size:', logoSizeInMB.toFixed(2), 'MB');
+            
+            // حد أقصى 5 ميجابايت للوغو
+            if (logoSizeInMB > 5.0) {
+                console.log('❌ Logo too large:', logoSizeInMB.toFixed(2), 'MB');
+                return res.status(400).json({ 
+                    error: 'صورة اللوغو كبيرة جداً. يرجى اختيار صورة أصغر من 5 ميجابايت',
+                    details: `حجم الصورة: ${logoSizeInMB.toFixed(2)} ميجابايت`
+                });
+            }
+            
             restaurant.logo = logo;
         }
         
