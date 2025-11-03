@@ -128,21 +128,6 @@ adminRouter.post('/admin/update-restaurant-profile', admin, async (req, res) => 
         }
         if (logo) {
             console.log('🔍 DEBUG: Updating logo from', restaurant.logo ? 'existing' : 'none', 'to new logo');
-            
-            // تحقق من حجم اللوغو (base64)
-            const logoSizeInBytes = Buffer.byteLength(logo, 'utf8');
-            const logoSizeInMB = logoSizeInBytes / (1024 * 1024);
-            console.log('🔍 DEBUG: Logo size:', logoSizeInMB.toFixed(2), 'MB');
-            
-            // حد أقصى 5 ميجابايت للوغو
-            if (logoSizeInMB > 5.0) {
-                console.log('❌ Logo too large:', logoSizeInMB.toFixed(2), 'MB');
-                return res.status(400).json({ 
-                    error: 'صورة اللوغو كبيرة جداً. يرجى اختيار صورة أصغر من 5 ميجابايت',
-                    details: `حجم الصورة: ${logoSizeInMB.toFixed(2)} ميجابايت`
-                });
-            }
-            
             restaurant.logo = logo;
         }
         
@@ -249,7 +234,7 @@ adminRouter.post('/admin/set-minimum-order-price', admin, async (req, res) => {
 // Public endpoint to get all restaurants
 adminRouter.get('/admin/get-all-restaurants', async (req, res) => {
     try {
-        const restaurants = await Restaurant.find({}).select('name address latitude longitude minimumOrderPrice isActive logo createdAt');
+        const restaurants = await Restaurant.find({}).select('name address latitude longitude minimumOrderPrice isActive logo openingTime closingTime createdAt');
         res.json(restaurants);
     } catch (e) {
         console.error('Error fetching restaurants:', e);
