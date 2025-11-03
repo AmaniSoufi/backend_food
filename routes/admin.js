@@ -94,8 +94,8 @@ adminRouter.post('/admin/create-restaurant', async (req, res) => {
 adminRouter.post('/admin/update-restaurant-profile', admin, async (req, res) => {
     try {
         console.log('🔍 DEBUG: Update restaurant profile request body:', req.body);
-        const { name, openingTime, closingTime } = req.body;
-        console.log('🔍 DEBUG: Received data - name:', name, 'openingTime:', openingTime, 'closingTime:', closingTime);
+        const { name, openingTime, closingTime, logo } = req.body;
+        console.log('🔍 DEBUG: Received data - name:', name, 'openingTime:', openingTime, 'closingTime:', closingTime, 'logo:', logo ? 'present' : 'not present');
         
         const adminUser = await User.findById(req.user);
         console.log('🔍 DEBUG: Admin user:', adminUser);
@@ -125,6 +125,10 @@ adminRouter.post('/admin/update-restaurant-profile', admin, async (req, res) => 
         if (closingTime) {
             console.log('🔍 DEBUG: Updating closingTime from', restaurant.closingTime, 'to', closingTime);
             restaurant.closingTime = closingTime;
+        }
+        if (logo) {
+            console.log('🔍 DEBUG: Updating logo from', restaurant.logo ? 'existing' : 'none', 'to new logo');
+            restaurant.logo = logo;
         }
         
         console.log('🔍 DEBUG: Saving restaurant with updated data...');
@@ -230,7 +234,7 @@ adminRouter.post('/admin/set-minimum-order-price', admin, async (req, res) => {
 // Public endpoint to get all restaurants
 adminRouter.get('/admin/get-all-restaurants', async (req, res) => {
     try {
-        const restaurants = await Restaurant.find({}).select('name address latitude longitude minimumOrderPrice isActive createdAt');
+        const restaurants = await Restaurant.find({}).select('name address latitude longitude minimumOrderPrice isActive logo openingTime closingTime createdAt');
         res.json(restaurants);
     } catch (e) {
         console.error('Error fetching restaurants:', e);
@@ -422,12 +426,41 @@ adminRouter.post("/admin/change-order-status", admin, async (req, res) => {
         
         // إرسال إشعار FCM للمشتري عند تحديث حالة الطلب
         try {
-            const { sendOrderStatusNotification } = require('./fcm_admin');
+            const { sendOrderStatusNotification } = require('./fcm');
             await sendOrderStatusNotification(order._id.toString(), order.userId.toString(), status);
             console.log('✅ FCM status update notification sent to customer');
         } catch (fcmError) {
             console.error('❌ Error sending FCM status update notification:', fcmError);
             // لا نريد أن نفشل العملية إذا فشل FCM
+        }
+        
+        // إنشاء إشعار في قاعدة البيانات للمشتري
+        try {
+            const { createNotification } = require('./notification.js');
+            const title = 'تحديث حالة الطلب';
+            const msgMap = {
+                1: 'تم تأكيد طلبك ✅',
+                2: 'تم تعيين مندوب للطلب 🚗',
+                3: 'المندوب قبل طلبك 🚗',
+                5: 'تم رفض طلبك ❌',
+                6: 'المطعم يحضر طلبك الآن 👨‍🍳',
+                7: 'طلبك في الطريق إليك 🚚',
+                8: 'تم تسليم طلبك 🎉',
+                9: 'تم إلغاء طلبك ❌',
+            };
+            const message = msgMap[Number(status)] || 'تم تحديث حالة طلبك';
+            await createNotification(
+                order.userId,
+                'status_update',
+                title,
+                message,
+                order._id,
+                order.restaurantId,
+                { status: Number(status) }
+            );
+            console.log('✅ DB status notification created for customer');
+        } catch (dbNotiErr) {
+            console.error('❌ Error creating DB status notification:', dbNotiErr);
         }
         
         res.json(orderObj);
@@ -582,11 +615,15 @@ adminRouter.post('/admin/auto-assign-delivery/:orderId', admin, async (req, res)
 
         // إرسال إشعار FCM للمندوب عند تعيينه للطلب
         try {
-            const { sendDeliveryAssignmentNotification } = require('./fcm_admin');
+            const { sendDeliveryAssignmentNotification, sendDriverAssignedNotificationToRestaurant } = require('./fcm_admin');
             await sendDeliveryAssignmentNotification(order._id.toString(), nearestDelivery._id.toString());
             console.log('✅ FCM delivery assignment notification sent to delivery person');
+            
+            // إرسال إشعار للمطعم أيضاً
+            await sendDriverAssignedNotificationToRestaurant(order._id.toString(), nearestDelivery._id.toString());
+            console.log('✅ FCM driver assigned notification sent to restaurant');
         } catch (fcmError) {
-            console.error('❌ Error sending FCM delivery assignment notification:', fcmError);
+            console.error('❌ Error sending FCM notifications:', fcmError);
             // لا نريد أن نفشل العملية إذا فشل FCM
         }
 
@@ -747,11 +784,15 @@ adminRouter.post('/admin/assign-driver/:orderId/:driverId', admin, async (req, r
 
         // إرسال إشعار FCM للمندوب عند تعيينه للطلب
         try {
-            const { sendDeliveryAssignmentNotification } = require('./fcm_admin');
+            const { sendDeliveryAssignmentNotification, sendDriverAssignedNotificationToRestaurant } = require('./fcm_admin');
             await sendDeliveryAssignmentNotification(order._id.toString(), driver._id.toString());
             console.log('✅ FCM delivery assignment notification sent to delivery person');
+            
+            // إرسال إشعار للمطعم أيضاً
+            await sendDriverAssignedNotificationToRestaurant(order._id.toString(), driver._id.toString());
+            console.log('✅ FCM driver assigned notification sent to restaurant');
         } catch (fcmError) {
-            console.error('❌ Error sending FCM delivery assignment notification:', fcmError);
+            console.error('❌ Error sending FCM notifications:', fcmError);
             // لا نريد أن نفشل العملية إذا فشل FCM
         }
 
