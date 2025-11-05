@@ -497,7 +497,24 @@ superadminRouter.get('/superadmin/platform-stats', superadmin, async (req, res) 
     try {
         console.log('🔍 DEBUG: SuperAdmin requesting platform stats');
         
-        const allOrders = await Order.find({});
+        // Get month and year from query parameters (optional)
+        const { year, month } = req.query;
+        let dateFilter = {};
+        
+        if (year && month) {
+            // Filter by specific month and year
+            const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+            const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
+            dateFilter = {
+                orderAt: {
+                    $gte: startDate,
+                    $lte: endDate
+                }
+            };
+            console.log('🔍 DEBUG: Filtering by month:', month, 'year:', year);
+        }
+        
+        const allOrders = await Order.find(dateFilter);
         const allRestaurants = await Restaurant.find({});
         const allUsers = await User.find({});
 
