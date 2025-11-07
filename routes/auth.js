@@ -233,19 +233,41 @@ authRouter.post("/tokenIsValid" , async (req , res) => {
     const token = req.header('x-auth-token');
 
     // هذا يتحقق إذا كان token غير موجود
-    if(!token) return res.json(false);
+    if(!token) {
+      console.log('❌ Token validation: No token provided');
+      return res.json(false);
+    }
 
     // هذا يتحقق إذا كان التوكن موجود ولكن غير صالح 
-    const verified = jwt.verify(token , "passwordKey" );
-    if(!verified) return res.json(false);
+    let verified;
+    try {
+      verified = jwt.verify(token , "passwordKey" );
+    } catch (jwtError) {
+      // التوكن تالف أو منتهي الصلاحية أو تم تعديله
+      console.log('❌ Token validation failed (JWT error):', jwtError.message);
+      return res.json(false);
+    }
+    
+    if(!verified) {
+      console.log('❌ Token validation: Verification returned false');
+      return res.json(false);
+    }
 
+    // التحقق من وجود المستخدم في قاعدة البيانات
     const user = await User.findById(verified.id);
-    if(!user) return res.json(false);
+    if(!user) {
+      console.log('❌ Token validation: User not found in database');
+      return res.json(false);
+    }
 
+    console.log('✅ Token validation: Token is valid for user:', user.name);
     res.json(true);
 
   }catch(e){
-    res.status(500).json({error:e.message});
+    // في حالة أي خطأ آخر (مثل خطأ في قاعدة البيانات)
+    console.error('❌ Token validation error:', e.message);
+    // نعيد false بدلاً من 500 لأن الخطأ يعني أن التوكن غير صالح
+    return res.json(false);
   }
 });
 
