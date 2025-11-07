@@ -546,6 +546,7 @@ superadminRouter.get('/superadmin/platform-stats', superadmin, async (req, res) 
         const stats = {
             platform: {
                 totalRestaurants: allRestaurants.length,
+                activeRestaurants: allRestaurants.filter(r => r.isActive === true).length,
                 totalUsers: allUsers.filter(user => user.type === 'user').length,
                 totalDeliveryDrivers: allUsers.filter(user => user.type === 'delivery').length,
                 totalAdmins: allUsers.filter(user => user.type === 'admin').length,
