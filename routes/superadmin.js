@@ -324,14 +324,20 @@ superadminRouter.get('/api/superadmin/deliveries/stats', superadmin, async (req,
         const deliveriesWithStats = [];
 
         for (const delivery of deliveryUsers) {
-            const allOrders = await Order.find({ deliveryPerson: delivery._id });
-            const completedOrders = await Order.find({ deliveryPerson: delivery._id, status: 8 });
+            // Fixed: use deliveryPersonId instead of deliveryPerson
+            const allOrders = await Order.find({ deliveryPersonId: delivery._id });
+            const completedOrders = await Order.find({ deliveryPersonId: delivery._id, status: 8 });
             const pendingOrders = await Order.find({ 
-                deliveryPerson: delivery._id, 
+                deliveryPersonId: delivery._id, 
                 status: { $in: [1, 2, 3, 4, 5, 6, 7] } 
             });
 
             const totalEarnings = completedOrders.reduce((sum, order) => sum + (order.deliveryPrice || 0), 0);
+            
+            console.log(`📊 Delivery ${delivery.name}:`);
+            console.log(`  - Total Orders: ${allOrders.length}`);
+            console.log(`  - Completed Orders: ${completedOrders.length}`);
+            console.log(`  - Total Earnings: ${totalEarnings}`);
 
             deliveriesWithStats.push({
                 _id: delivery._id,
