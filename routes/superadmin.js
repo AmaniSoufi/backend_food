@@ -4,8 +4,21 @@ const superadmin = require('../middlewares/superadmin');
 const Order = require('../models/order');
 const Restaurant = require('../models/restaurant');
 const User = require('../models/user');
+const JoinRequest = require('../models/joinRequest');
+const { sendJoinRequestResultNotification } = require('../utils/fcmJoinResult');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+
+function generateTempJoinPassword() {
+ return crypto.randomBytes(8).toString('base64url').slice(0, 12);
+}
+
+function mapJoinVehicleToEnum(vehicleLabel) {
+    const v = vehicleLabel ? String(vehicleLabel) : '';
+    if (v.includes('سيارة')) return 'car';
+    return 'motorcycle';
+}
 
 // =====================================
 // Super Admin Login
@@ -664,4 +677,131 @@ superadminRouter.get('/superadmin/commission-details', superadmin, async (req, r
     }
 });
 
-module.exports = superadminRouter; 
+// =====================================
+// Join requests (delivery / restaurant applications)
+// =====================================
+superadminRouter.get('/api/superadmin/join-requests', superadmin, async (req, res) => {
+    try {
+        const { status } = req.query;
+        const filter = {};
+        if (status && ['pending', 'accepted', 'rejected'].includes(status)) {
+            filter.status = status;
+        }
+        const list = await JoinRequest.find(filter).sort({ createdAt: -1 }).lean();
+        res.json(list);
+    } catch (error) {
+        console.error('Error listing join requests:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+superadminRouter.post('/api/superadmin/join-requests/:id/approve', superadmin, async (req, res) => {
+    try {
+        const jr = await JoinRequest.findById(req.params.id);
+        if (!jr) {
+            return res.status(404).json({ msg: 'الطلب غير موجود' });
+        }
+        if (jr.status !== 'pending') {
+            return res.status(400).json({ msg: 'تمت معالجة هذا الطلب مسبقاً' });
+        }
+
+        const phone = String(jr.phone || '').trim();
+        if (!phone) {
+            return res.status(400).json({ msg: 'رقم الهاتف غير صالح في الطلب' });
+        }
+
+        const existingPhone = await User.findOne({ phone });
+        if (existingPhone) {
+            return res.status(400).json({ msg: 'يوجد حساب مسجّل بنفس رقم الهاتف' });
+        }
+
+        const loginEmail =
+            jr.email && String(jr.email).trim()
+                ? String(jr.email).trim()
+                : `user_${phone}@app.com`;
+
+        const existingEmail = await User.findOne({ email: loginEmail });
+        if (existingEmail) {
+            return res.status(400).json({ msg: 'البريد الإلكتروني مستخدم مسبقاً' });
+        }
+
+        const temporaryPassword = generateTempJoinPassword();
+        const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+
+        let createdUser;
+
+        if (jr.type === 'delivery') {
+            createdUser = await User.create({
+                name: jr.fullName,
+                email: loginEmail,
+                phone,
+                password: hashedPassword,
+                type: 'delivery',
+                status: 'accepted',
+                vehicleType: mapJoinVehicleToEnum(jr.vehicleType),
+                address: '',
+                cart: [],
+                fcmToken: jr.fcmToken || null,
+            });
+        } else if (jr.type === 'restaurant') {
+            const restaurant = await Restaurant.create({
+                name: jr.restaurantName || `${jr.fullName}`,
+                address: '',
+                minimumOrderPrice: 0,
+            });
+            createdUser = await User.create({
+                name: jr.fullName,
+                email: loginEmail,
+                phone,
+                password: hashedPassword,
+                type: 'admin',
+                restaurant: restaurant._id,
+                status: 'accepted',
+                address: '',
+                cart: [],
+                fcmToken: jr.fcmToken || null,
+            });
+        } else {
+            return res.status(400).json({ msg: 'نوع الطلب غير مدعوم' });
+        }
+
+        jr.status = 'accepted';
+        jr.reviewedAt = new Date();
+        jr.createdUserId = createdUser._id;
+        await jr.save();
+        await sendJoinRequestResultNotification(jr.fcmToken, true);
+
+        res.json({
+            msg: 'تم قبول طلب الانضمام وإنشاء الحساب',
+            temporaryPassword,
+            loginEmail,
+            loginPhone: phone,
+            joinRequest: jr,
+        });
+    } catch (error) {
+        console.error('Error approving join request:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+superadminRouter.post('/api/superadmin/join-requests/:id/reject', superadmin, async (req, res) => {
+    try {
+        const jr = await JoinRequest.findById(req.params.id);
+        if (!jr) {
+            return res.status(404).json({ msg: 'الطلب غير موجود' });
+        }
+        if (jr.status !== 'pending') {
+            return res.status(400).json({ msg: 'تمت معالجة هذا الطلب مسبقاً' });
+        }
+        jr.status = 'rejected';
+        jr.reviewedAt = new Date();
+        await jr.save();
+        await sendJoinRequestResultNotification(jr.fcmToken, false);
+        res.json({ msg: 'تم رفض طلب الانضمام', joinRequest: jr });
+    } catch (error) {
+        console.error('Error rejecting join request:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+module.exports = superadminRouter;
