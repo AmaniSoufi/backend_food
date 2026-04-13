@@ -324,14 +324,20 @@ superadminRouter.get('/api/superadmin/deliveries/stats', superadmin, async (req,
         const deliveriesWithStats = [];
 
         for (const delivery of deliveryUsers) {
-            const allOrders = await Order.find({ deliveryPerson: delivery._id });
-            const completedOrders = await Order.find({ deliveryPerson: delivery._id, status: 8 });
+            // Fixed: use deliveryPersonId instead of deliveryPerson
+            const allOrders = await Order.find({ deliveryPersonId: delivery._id });
+            const completedOrders = await Order.find({ deliveryPersonId: delivery._id, status: 8 });
             const pendingOrders = await Order.find({ 
-                deliveryPerson: delivery._id, 
+                deliveryPersonId: delivery._id, 
                 status: { $in: [1, 2, 3, 4, 5, 6, 7] } 
             });
 
             const totalEarnings = completedOrders.reduce((sum, order) => sum + (order.deliveryPrice || 0), 0);
+            
+            console.log(`📊 Delivery ${delivery.name}:`);
+            console.log(`  - Total Orders: ${allOrders.length}`);
+            console.log(`  - Completed Orders: ${completedOrders.length}`);
+            console.log(`  - Total Earnings: ${totalEarnings}`);
 
             deliveriesWithStats.push({
                 _id: delivery._id,
@@ -497,7 +503,24 @@ superadminRouter.get('/superadmin/platform-stats', superadmin, async (req, res) 
     try {
         console.log('🔍 DEBUG: SuperAdmin requesting platform stats');
         
-        const allOrders = await Order.find({});
+        // Get month and year from query parameters (optional)
+        const { year, month } = req.query;
+        let dateFilter = {};
+        
+        if (year && month) {
+            // Filter by specific month and year
+            const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+            const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
+            dateFilter = {
+                orderAt: {
+                    $gte: startDate,
+                    $lte: endDate
+                }
+            };
+            console.log('🔍 DEBUG: Filtering by month:', month, 'year:', year);
+        }
+        
+        const allOrders = await Order.find(dateFilter);
         const allRestaurants = await Restaurant.find({});
         const allUsers = await User.find({});
 
@@ -529,6 +552,7 @@ superadminRouter.get('/superadmin/platform-stats', superadmin, async (req, res) 
         const stats = {
             platform: {
                 totalRestaurants: allRestaurants.length,
+                activeRestaurants: allRestaurants.filter(r => r.isActive === true).length,
                 totalUsers: allUsers.filter(user => user.type === 'user').length,
                 totalDeliveryDrivers: allUsers.filter(user => user.type === 'delivery').length,
                 totalAdmins: allUsers.filter(user => user.type === 'admin').length,
