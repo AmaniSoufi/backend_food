@@ -776,7 +776,13 @@ superadminRouter.post('/api/superadmin/join-requests/:id/approve', superadmin, a
             temporaryPassword,
             loginEmail,
             loginPhone: phone,
-            joinRequest: jr,
+            // نسخة صريحة لعرضها في تطبيق المسؤول (نفس القيم أعلاه)
+            credentials: {
+                temporaryPassword,
+                loginEmail,
+                loginPhone: phone,
+            },
+            joinRequestId: jr._id,
         });
     } catch (error) {
         console.error('Error approving join request:', error);
